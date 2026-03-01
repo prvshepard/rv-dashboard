@@ -1471,14 +1471,14 @@
             document.getElementById('totalRVs').textContent = `${total} RVs on Lot`;
         }
 
-// Google Sheets Integration
-const GOOGLE_CONFIG = {
-    CLIENT_ID: '971946834908-fqhmdrie6ntt0mmmbh4rkpaop8edvgr8.apps.googleusercontent.com',
-    API_KEY: 'AIzaSyB6kg5hZiXJxUoGtKSXIxKj7JfOGNN6jbc',
-    SPREADSHEET_ID: '1Nkf_BoqDhanJRCyeqIerF-Te_Z_R0h3mZelcgTjS62Y',
-    DISCOVERY_DOCS: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
-    SCOPES: 'https://www.googleapis.com/auth/spreadsheets'
-};
+        // Google Sheets Integration
+        const GOOGLE_CONFIG = {
+            CLIENT_ID: '971946834908-fqhmdrie6ntt0mmmbh4rkpaop8edvgr8.apps.googleusercontent.com',
+            API_KEY: 'AIzaSyB6kg5hZiXJxUoGtKSXIxKj7JfOGNN6jbc',
+            SPREADSHEET_ID: '1Nkf_BoqDhanJRCyeqIerF-Te_Z_R0h3mZelcgTjS62Y',
+            DISCOVERY_DOCS: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
+            SCOPES: 'https://www.googleapis.com/auth/spreadsheets'
+        };
 
         let gapiInited = false;
         let gisInited = false;
