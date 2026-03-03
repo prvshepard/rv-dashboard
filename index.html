@@ -24,6 +24,8 @@
             --status-check: #5e5ce6;
             --status-ready: #34c759;
             --status-approval: #ffcc00;
+            --status-not-on-lot: #9ca3af;
+            --status-on-lot: #34c759;
             --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
 
@@ -633,6 +635,18 @@
             border: 1px solid var(--status-approval);
         }
 
+        .status-not-on-lot {
+            background: rgba(156, 163, 175, 0.2);
+            color: var(--status-not-on-lot);
+            border: 1px solid var(--status-not-on-lot);
+        }
+
+        .status-on-lot {
+            background: rgba(52, 199, 89, 0.2);
+            color: var(--status-on-lot);
+            border: 1px solid var(--status-on-lot);
+        }
+
         .empty-state {
             text-align: center;
             padding: 100px 20px;
@@ -948,6 +962,8 @@
                 <label class="filter-label">Filter by Status:</label>
                 <div class="filter-group">
                     <button class="filter-btn active" data-filter="all" data-type="status">All</button>
+                    <button class="filter-btn" data-filter="Not On Lot" data-type="status">Not On Lot</button>
+                    <button class="filter-btn" data-filter="On Lot" data-type="status">On Lot</button>
                     <button class="filter-btn" data-filter="In progress" data-type="status">In Progress</button>
                     <button class="filter-btn" data-filter="Awaiting parts" data-type="status">Parts</button>
                     <button class="filter-btn" data-filter="Quality check" data-type="status">QC</button>
@@ -1889,6 +1905,8 @@
                         <label class="form-label">Status *</label>
                         <select class="form-select" name="status" required>
                             <option value="">Select Status</option>
+                            <option value="Not On Lot">Not On Lot</option>
+                            <option value="On Lot">On Lot</option>
                             <option value="In progress">In progress</option>
                             <option value="Awaiting parts">Awaiting parts</option>
                             <option value="Quality check">Quality check</option>
