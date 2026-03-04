@@ -1935,7 +1935,7 @@
                 console.log('Fetching data from spreadsheet:', GOOGLE_CONFIG.SPREADSHEET_ID);
                 const response = await gapi.client.sheets.spreadsheets.values.get({
                     spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
-                    range: 'Sheet1!A:R',
+                    range: 'Sheet1!A1:R1000',  // Explicitly specify all columns A through R
                 });
 
                 console.log('Response received:', response);
@@ -1952,10 +1952,30 @@
                 
                 for (let i = 1; i < rows.length; i++) {
                     const row = rows[i];
+                    
+                    // Debug: Show the raw row data
+                    if (i === 1) {
+                        console.log('=== First row detailed debug ===');
+                        console.log('Row array length:', row.length);
+                        console.log('Headers array length:', headers.length);
+                        console.log('Row[5] (RV Photo URL position):', row[5]);
+                        console.log('Full row:', row);
+                    }
+                    
                     const obj = {};
                     headers.forEach((header, index) => {
                         const key = toCamelCase(header);
-                        obj[key] = row[index] || '';
+                        const value = row[index];
+                        obj[key] = value !== undefined ? value : '';
+                        
+                        // Debug column F specifically
+                        if (index === 5 && i === 1) {
+                            console.log('Processing column F (index 5):');
+                            console.log('  Header:', header);
+                            console.log('  Key:', key);
+                            console.log('  Value from row[5]:', value);
+                            console.log('  Final obj.rvPhotoUrl:', obj.rvPhotoUrl);
+                        }
                     });
                     
                     // Convert numeric fields
