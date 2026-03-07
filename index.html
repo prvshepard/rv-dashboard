@@ -533,6 +533,36 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 8px;
+            gap: 12px;
+        }
+
+        .progress-input {
+            width: 60px;
+            padding: 4px 8px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .progress-input:hover {
+            border-color: var(--accent-info);
+        }
+
+        .progress-input:focus {
+            outline: none;
+            border-color: var(--accent-info);
+            background: var(--bg-surface);
+        }
+
+        .progress-input::-webkit-inner-spin-button,
+        .progress-input::-webkit-outer-spin-button {
+            opacity: 1;
         }
 
         .progress-label {
@@ -1369,6 +1399,85 @@
         let currentRepairFilter = 'all';
 
         // Update RO Status
+        // Status to Progress mapping
+        const STATUS_PROGRESS_MAP = {
+            'Not On Lot': 0,
+            'On Lot': 15,
+            'In progress': 50,
+            'Awaiting Approval': 40,
+            'Awaiting parts': 40,
+            'Quality check': 75,
+            'Ready for pickup': 95,
+            'Completed': 100
+        };
+
+        // Update RO Progress manually
+        async function updateROProgress(index, newProgress) {
+            if (!accessToken) {
+                alert('Please connect to Google Sheets first!');
+                return;
+            }
+
+            // Validate progress
+            if (newProgress < 0) newProgress = 0;
+            if (newProgress > 100) newProgress = 100;
+
+            console.log('Manually updating progress for index:', index, 'to:', newProgress + '%');
+
+            try {
+                // Get the sorted data to find the correct RO
+                const sorted = [...currentData].map(ro => ({
+                    ...ro,
+                    priorityScore: calculatePriority(ro)
+                })).sort((a, b) => b.priorityScore - a.priorityScore);
+                
+                const ro = sorted[index];
+                if (!ro) {
+                    console.error('Could not find RO at index:', index);
+                    alert('Error: Could not find the repair order.');
+                    return;
+                }
+
+                console.log('Updating progress for:', ro.customerName, 'to', newProgress + '%');
+
+                // Update in currentData
+                const originalIndex = currentData.findIndex(item => 
+                    item.customerName === ro.customerName && 
+                    item.dateReceived === ro.dateReceived
+                );
+
+                if (originalIndex !== -1) {
+                    currentData[originalIndex].percentComplete = newProgress;
+                    console.log('Updated currentData at index:', originalIndex);
+                }
+
+                // Update Google Sheets - Progress is column K (11th column)
+                const rowNumber = originalIndex + 2;
+                const range = `Sheet1!K${rowNumber}`;
+
+                console.log('Updating sheet row:', rowNumber, 'with progress:', newProgress);
+
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: range,
+                    valueInputOption: 'RAW',
+                    resource: {
+                        values: [[newProgress]]
+                    }
+                });
+
+                console.log('✓ Progress updated successfully in sheet');
+
+                // Refresh the board
+                renderBoard();
+
+            } catch (error) {
+                console.error('Error updating progress:', error);
+                alert('Error updating progress: ' + error.message);
+                await loadDataFromSheets();
+            }
+        }
+
         async function updateROStatus(index, newStatus) {
             if (!accessToken) {
                 alert('Please connect to Google Sheets first!');
@@ -1401,6 +1510,10 @@
 
                 console.log('Updating status for:', ro.customerName, 'from', ro.status, 'to', newStatus);
 
+                // Get automatic progress for this status
+                const autoProgress = STATUS_PROGRESS_MAP[newStatus] || 0;
+                console.log('Auto-setting progress to:', autoProgress + '%');
+
                 // Update in currentData
                 const originalIndex = currentData.findIndex(item => 
                     item.customerName === ro.customerName && 
@@ -1409,25 +1522,32 @@
 
                 if (originalIndex !== -1) {
                     currentData[originalIndex].status = newStatus;
+                    currentData[originalIndex].percentComplete = autoProgress;
                     console.log('Updated currentData at index:', originalIndex);
                 }
 
-                // Update Google Sheets - Status is column M (13th column)
+                // Update Google Sheets - Status is column M (13th), Progress is column K (11th)
                 const rowNumber = originalIndex + 2; // +2 for header and 0-based index
-                const range = `Sheet1!M${rowNumber}`;
-
-                console.log('Updating sheet row:', rowNumber, 'range:', range);
-
-                await gapi.client.sheets.spreadsheets.values.update({
+                
+                // Update both status and progress in one batch
+                await gapi.client.sheets.spreadsheets.values.batchUpdate({
                     spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
-                    range: range,
-                    valueInputOption: 'RAW',
                     resource: {
-                        values: [[newStatus]]
+                        valueInputOption: 'RAW',
+                        data: [
+                            {
+                                range: `Sheet1!K${rowNumber}`,
+                                values: [[autoProgress]]
+                            },
+                            {
+                                range: `Sheet1!M${rowNumber}`,
+                                values: [[newStatus]]
+                            }
+                        ]
                     }
                 });
 
-                console.log('✓ Status updated successfully in sheet');
+                console.log('✓ Status and progress updated successfully in sheet');
 
                 // Show success feedback
                 dropdown.style.opacity = '1';
@@ -1946,6 +2066,14 @@
                         <div class="progress-section">
                             <div class="progress-header">
                                 <span class="progress-label">Progress</span>
+                                <input type="number" 
+                                       class="progress-input" 
+                                       value="${ro.percentComplete}" 
+                                       min="0" 
+                                       max="100" 
+                                       step="5"
+                                       onchange="updateROProgress(${sorted.indexOf(ro)}, parseInt(this.value))"
+                                       title="Manual adjustment">
                                 <span class="progress-value">${ro.percentComplete}%</span>
                             </div>
                             <div class="progress-bar">
