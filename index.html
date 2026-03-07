@@ -636,6 +636,83 @@
             font-family: 'JetBrains Mono', monospace;
         }
 
+        .status-selector-container {
+            margin-bottom: 16px;
+        }
+
+        .status-dropdown {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid;
+        }
+
+        .status-dropdown:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-dropdown:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.3);
+        }
+
+        /* Status-specific dropdown colors */
+        .status-dropdown.status-not-on-lot {
+            background: rgba(156, 163, 175, 0.2);
+            color: var(--status-not-on-lot);
+            border-color: var(--status-not-on-lot);
+        }
+
+        .status-dropdown.status-on-lot {
+            background: rgba(52, 199, 89, 0.2);
+            color: var(--status-on-lot);
+            border-color: var(--status-on-lot);
+        }
+
+        .status-dropdown.status-in-progress {
+            background: rgba(10, 132, 255, 0.2);
+            color: var(--status-progress);
+            border-color: var(--status-progress);
+        }
+
+        .status-dropdown.status-awaiting-parts {
+            background: rgba(255, 149, 0, 0.2);
+            color: var(--status-parts);
+            border-color: var(--status-parts);
+        }
+
+        .status-dropdown.status-quality-check {
+            background: rgba(94, 92, 230, 0.2);
+            color: var(--status-check);
+            border-color: var(--status-check);
+        }
+
+        .status-dropdown.status-ready-for-pickup {
+            background: rgba(52, 199, 89, 0.2);
+            color: var(--status-ready);
+            border-color: var(--status-ready);
+        }
+
+        .status-dropdown.status-awaiting-approval {
+            background: rgba(255, 204, 0, 0.2);
+            color: var(--status-approval);
+            border-color: var(--status-approval);
+        }
+
+        .status-dropdown.status-completed {
+            background: rgba(52, 199, 89, 0.3);
+            color: #2ecc71;
+            border-color: #2ecc71;
+        }
+
         .status-dot {
             width: 6px;
             height: 6px;
@@ -682,6 +759,13 @@
             background: rgba(52, 199, 89, 0.2);
             color: var(--status-on-lot);
             border: 1px solid var(--status-on-lot);
+        }
+
+        .status-completed {
+            background: rgba(52, 199, 89, 0.3);
+            color: #2ecc71;
+            border: 1px solid #2ecc71;
+            font-weight: 700;
         }
 
         .empty-state {
@@ -1035,10 +1119,11 @@
                     <button class="filter-btn" data-filter="Not On Lot" data-type="status">Not On Lot</button>
                     <button class="filter-btn" data-filter="On Lot" data-type="status">On Lot</button>
                     <button class="filter-btn" data-filter="In progress" data-type="status">In Progress</button>
-                    <button class="filter-btn" data-filter="Awaiting parts" data-type="status">Parts</button>
+                    <button class="filter-btn" data-filter="Awaiting parts" data-type="status">Awaiting Parts</button>
                     <button class="filter-btn" data-filter="Quality check" data-type="status">QC</button>
                     <button class="filter-btn" data-filter="Ready for pickup" data-type="status">Ready</button>
-                    <button class="filter-btn" data-filter="Awaiting Approval" data-type="status">Approval</button>
+                    <button class="filter-btn" data-filter="Awaiting Approval" data-type="status">Awaiting Approval</button>
+                    <button class="filter-btn" data-filter="Completed" data-type="status">Completed</button>
                 </div>
             </div>
 
@@ -1282,6 +1367,90 @@
         let currentData = [];
         let currentStatusFilter = 'all';
         let currentRepairFilter = 'all';
+
+        // Update RO Status
+        async function updateROStatus(index, newStatus) {
+            if (!accessToken) {
+                alert('Please connect to Google Sheets first!');
+                return;
+            }
+
+            console.log('Updating status for index:', index, 'to:', newStatus);
+
+            // Show loading indicator
+            const dropdown = event.target;
+            const originalBg = dropdown.style.background;
+            dropdown.style.opacity = '0.6';
+            dropdown.disabled = true;
+
+            try {
+                // Get the sorted data to find the correct RO
+                const sorted = [...currentData].map(ro => ({
+                    ...ro,
+                    priorityScore: calculatePriority(ro)
+                })).sort((a, b) => b.priorityScore - a.priorityScore);
+                
+                const ro = sorted[index];
+                if (!ro) {
+                    console.error('Could not find RO at index:', index);
+                    alert('Error: Could not find the repair order.');
+                    dropdown.style.opacity = '1';
+                    dropdown.disabled = false;
+                    return;
+                }
+
+                console.log('Updating status for:', ro.customerName, 'from', ro.status, 'to', newStatus);
+
+                // Update in currentData
+                const originalIndex = currentData.findIndex(item => 
+                    item.customerName === ro.customerName && 
+                    item.dateReceived === ro.dateReceived
+                );
+
+                if (originalIndex !== -1) {
+                    currentData[originalIndex].status = newStatus;
+                    console.log('Updated currentData at index:', originalIndex);
+                }
+
+                // Update Google Sheets - Status is column M (13th column)
+                const rowNumber = originalIndex + 2; // +2 for header and 0-based index
+                const range = `Sheet1!M${rowNumber}`;
+
+                console.log('Updating sheet row:', rowNumber, 'range:', range);
+
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: range,
+                    valueInputOption: 'RAW',
+                    resource: {
+                        values: [[newStatus]]
+                    }
+                });
+
+                console.log('✓ Status updated successfully in sheet');
+
+                // Show success feedback
+                dropdown.style.opacity = '1';
+                dropdown.disabled = false;
+                
+                // Brief flash to show success
+                dropdown.style.boxShadow = '0 0 0 3px rgba(52, 199, 89, 0.5)';
+                setTimeout(() => {
+                    dropdown.style.boxShadow = '';
+                }, 500);
+
+                // Refresh the board
+                renderBoard();
+
+            } catch (error) {
+                console.error('Error updating status:', error);
+                alert('Error updating status: ' + error.message + '\n\nCheck the console for details.');
+                dropdown.style.opacity = '1';
+                dropdown.disabled = false;
+                // Reload from sheets to revert
+                await loadDataFromSheets();
+            }
+        }
 
         // Photo Upload Function
         async function uploadPhoto(index) {
@@ -1719,6 +1888,21 @@
                             📷 ${ro.rvPhotoUrl ? 'Update Photo' : 'Add Photo'}
                         </button>
                         
+                        <div class="status-selector-container">
+                            <select class="status-dropdown status-${statusClass}" 
+                                    onchange="updateROStatus(${sorted.indexOf(ro)}, this.value)"
+                                    data-original-status="${ro.status}">
+                                <option value="Not On Lot" ${ro.status === 'Not On Lot' ? 'selected' : ''}>Not On Lot</option>
+                                <option value="On Lot" ${ro.status === 'On Lot' ? 'selected' : ''}>On Lot</option>
+                                <option value="In progress" ${ro.status === 'In progress' ? 'selected' : ''}>In Progress</option>
+                                <option value="Awaiting parts" ${ro.status === 'Awaiting parts' ? 'selected' : ''}>Awaiting Parts</option>
+                                <option value="Quality check" ${ro.status === 'Quality check' ? 'selected' : ''}>Quality Check</option>
+                                <option value="Ready for pickup" ${ro.status === 'Ready for pickup' ? 'selected' : ''}>Ready for Pickup</option>
+                                <option value="Awaiting Approval" ${ro.status === 'Awaiting Approval' ? 'selected' : ''}>Awaiting Approval</option>
+                                <option value="Completed" ${ro.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                            </select>
+                        </div>
+                        
                         <div class="rv-info">
                             <div class="info-row">
                                 <span class="info-label">Type:</span>
@@ -1792,11 +1976,6 @@
                             ` : ''}
                         </div>
                         ` : ''}
-                        
-                        <div class="status-badge status-${statusClass}">
-                            <span class="status-dot" style="background: var(--status-${statusClass})"></span>
-                            ${ro.status || 'Unknown'}
-                        </div>
                     </div>
                 `;
             }).join('');
@@ -2301,6 +2480,7 @@
                             <option value="Quality check">Quality check</option>
                             <option value="Ready for pickup">Ready for pickup</option>
                             <option value="Awaiting Approval">Awaiting Approval</option>
+                            <option value="Completed">Completed</option>
                         </select>
                     </div>
                     <div class="form-field">
