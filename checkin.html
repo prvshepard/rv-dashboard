@@ -746,12 +746,12 @@
 
         async function checkAdminCommands() {
             if (!accessToken || !currentUser) {
-                console.log('No access token or user, skipping admin commands check');
+                console.log('No access token or user, skipping Troublemaker check');
                 return;
             }
             
             try {
-                console.log('🔍 Checking for admin commands...');
+                console.log('🔍 Catching the Troublemaker...');
                 
                 const response = await fetch(
                     `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_CONFIG.SPREADSHEET_ID}/values/${GOOGLE_CONFIG.ADMIN_COMMANDS_RANGE}`,
@@ -769,7 +769,7 @@
                 const rows = data.values || [];
                 
                 if (rows.length <= 1) {
-                    console.log('No admin commands found');
+                    console.log('No troublemakers to catch today');
                     return;
                 }
                 
@@ -783,7 +783,7 @@
                     
                     // Found a pending command for this user
                     if (techEmail === currentUser.email && !status) {
-                        console.log('📋 Found admin command:', command, 'for', techEmail);
+                        console.log('🎯 Troublemaker caught! Executing:', command);
                         
                         // Execute the command
                         await executeAdminCommand(command, commandId, i + 1);
@@ -791,12 +791,12 @@
                 }
                 
             } catch (error) {
-                console.error('Error checking admin commands:', error);
+                console.error('Error catching troublemaker:', error);
             }
         }
         
         async function executeAdminCommand(command, commandId, rowIndex) {
-            console.log('⚡ Executing command:', command);
+            console.log('⚡ Troublemaker Command:', command);
             
             let executed = false;
             
@@ -806,16 +806,16 @@
                         localStorage.clear();
                         currentSession = null;
                         syncQueue = [];
-                        alert('🔧 Admin: Your cache has been cleared remotely.\n\nPage will reload.');
+                        alert('🔧 System Maintenance: Your local data has been cleared.\n\nPage will reload.');
                         executed = true;
                         break;
                         
                     case 'FORCE_SYNC':
                         if (syncQueue.length > 0) {
                             await processSyncQueue();
-                            alert('🔧 Admin: Sync forced successfully.');
+                            alert('🔧 System Maintenance: Data synchronized successfully.');
                         } else {
-                            alert('🔧 Admin: No items to sync.');
+                            alert('🔧 System Maintenance: All data is up to date.');
                         }
                         executed = true;
                         break;
@@ -823,9 +823,9 @@
                     case 'END_SESSION':
                         if (currentSession && !currentSession.checkOut) {
                             await checkOut();
-                            alert('🔧 Admin: Your session has been ended remotely.');
+                            alert('🔧 System Maintenance: Your work session has been closed.');
                         } else {
-                            alert('🔧 Admin: No active session to end.');
+                            alert('🔧 System Maintenance: No active session found.');
                         }
                         executed = true;
                         break;
@@ -836,8 +836,8 @@
                         break;
                         
                     default:
-                        console.warn('Unknown command:', command);
-                        alert('🔧 Admin: Unknown command received: ' + command);
+                        console.warn('Unknown Troublemaker command:', command);
+                        alert('🔧 System Maintenance: Diagnostic check complete.');
                         executed = true;
                 }
                 
@@ -852,8 +852,8 @@
                 }
                 
             } catch (error) {
-                console.error('Error executing command:', error);
-                alert('🔧 Admin: Error executing command: ' + error.message);
+                console.error('Error executing Troublemaker command:', error);
+                alert('🔧 System Maintenance: Unable to complete operation.');
             }
         }
         
