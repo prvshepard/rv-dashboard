@@ -534,6 +534,63 @@
             color: var(--text-primary);
         }
 
+        .qr-code-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--bg-elevated);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .qr-code-container {
+            cursor: pointer;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            transition: transform 0.2s ease;
+        }
+
+        .qr-code-container:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .qr-canvas {
+            display: block;
+            width: 100px;
+            height: 100px;
+        }
+
+        .qr-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .print-qr-btn {
+            padding: 6px 12px;
+            background: var(--accent-info);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .print-qr-btn:hover {
+            background: var(--accent-low);
+            transform: translateY(-1px);
+        }
+
         .rv-info {
             display: flex;
             flex-direction: column;
@@ -2342,6 +2399,16 @@
                         
                         <div class="customer-name">${ro.customerName || 'Unknown Customer'}</div>
                         
+                        <div class="qr-code-section">
+                            <div class="qr-code-container" onclick="openQRModal(${sorted.indexOf(ro)})">
+                                <canvas id="qr-${sorted.indexOf(ro)}" class="qr-canvas"></canvas>
+                            </div>
+                            <div class="qr-label">${ro.customerName || 'Unknown'}</div>
+                            <button class="print-qr-btn" onclick="printQRLabel(${sorted.indexOf(ro)})" title="Print QR Label">
+                                🖨️ Print Label
+                            </button>
+                        </div>
+                        
                         <button class="photo-upload-btn" onclick="uploadPhoto(${sorted.indexOf(ro)})" title="Add/Update Photo">
                             📷 ${ro.rvPhotoUrl ? 'Update Photo' : 'Add Photo'}
                         </button>
@@ -2446,6 +2513,136 @@
                     </div>
                 `;
             }).join('');
+            
+            // Generate QR codes after DOM is updated
+            setTimeout(() => generateAllQRCodes(filtered), 100);
+        }
+
+        // Generate QR codes for all ROs
+        function generateAllQRCodes(filteredData) {
+            filteredData.forEach((ro, index) => {
+                const canvas = document.getElementById(`qr-${index}`);
+                if (canvas) {
+                    generateQRCode(canvas, ro, index);
+                }
+            });
+        }
+
+        // Generate individual QR code
+        function generateQRCode(canvas, ro, index) {
+            const ctx = canvas.getContext('2d');
+            
+            // Create unique RO ID from customer name + date
+            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived || 'NODOCDATE'}`;
+            
+            // QR code URL - points to check-in page
+            const checkInURL = `https://prvshepard.github.io/rv-dashboard/checkin.html?ro=${encodeURIComponent(roId)}&customer=${encodeURIComponent(ro.customerName)}`;
+            
+            // Generate QR code using QRCode library
+            // Clear canvas first
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Simple QR generation using canvas API
+            // We'll use a library-free approach for now
+            drawQRPlaceholder(ctx, canvas.width, canvas.height, roId);
+        }
+
+        // Temporary QR placeholder (will be replaced with actual QR library)
+        function drawQRPlaceholder(ctx, width, height, text) {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = 'black';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(5, 5, width - 10, height - 10);
+            
+            // Draw simple pattern
+            for (let i = 0; i < 5; i++) {
+                for (let j = 0; j < 5; j++) {
+                    if ((i + j) % 2 === 0) {
+                        ctx.fillRect(10 + i * 18, 10 + j * 18, 16, 16);
+                    }
+                }
+            }
+            
+            // Add text indicator
+            ctx.fillStyle = 'black';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('QR', width / 2, height - 10);
+        }
+
+        // Open QR modal for printing
+        function openQRModal(index) {
+            alert('QR Modal - Coming soon! Will show enlarged QR code for printing.');
+        }
+
+        // Print QR label
+        function printQRLabel(index) {
+            const sorted = [...currentData].map(ro => ({
+                ...ro,
+                priorityScore: calculatePriority(ro)
+            })).sort((a, b) => b.priorityScore - a.priorityScore);
+            
+            const ro = sorted[index];
+            if (!ro) return;
+            
+            // Create printable label
+            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived || 'NODATE'}`;
+            const canvas = document.getElementById(`qr-${index}`);
+            
+            // Open print window with just the QR code and customer name
+            const printWindow = window.open('', '_blank', 'width=400,height=600');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>QR Label - ${ro.customerName}</title>
+                    <style>
+                        body {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            padding: 20px;
+                            font-family: Arial, sans-serif;
+                        }
+                        canvas {
+                            border: 2px solid black;
+                            margin: 20px;
+                        }
+                        .customer-name {
+                            font-size: 18px;
+                            font-weight: bold;
+                            text-align: center;
+                            margin-top: 10px;
+                        }
+                        .ro-id {
+                            font-size: 14px;
+                            color: #666;
+                            text-align: center;
+                            margin-top: 5px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h2>Scan to Check In/Out</h2>
+                    <canvas id="printQR" width="300" height="300"></canvas>
+                    <div class="customer-name">${ro.customerName}</div>
+                    <div class="ro-id">${roId}</div>
+                </body>
+                </html>
+            `);
+            
+            // Copy QR code to print window
+            const printCanvas = printWindow.document.getElementById('printQR');
+            const printCtx = printCanvas.getContext('2d');
+            printCtx.drawImage(canvas, 0, 0, 300, 300);
+            
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
         }
 
         function updateStats(data, filteredData) {
@@ -3220,6 +3417,7 @@
     </div>
 
     <script src="https://accounts.google.com/gsi/client?v=2" async defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://apis.google.com/js/api.js?v=2" onload="gapiLoaded()"></script>
     <script>
         // Timeout if Google APIs don't load within 10 seconds

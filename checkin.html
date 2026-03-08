@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tech Check-In - PRVS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #1e3a8a;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .logo p {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .ro-info {
+            background: #f1f5f9;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .ro-info h2 {
+            color: #1e3a8a;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #1e293b;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge.checked-out {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-badge.checked-in {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-start {
+            background: #22c55e;
+            color: white;
+        }
+
+        .btn-start:hover {
+            background: #16a34a;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3);
+        }
+
+        .btn-end {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-end:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .timer {
+            text-align: center;
+            padding: 20px;
+            background: #fffbeb;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .timer h3 {
+            color: #92400e;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .timer-display {
+            font-size: 48px;
+            font-weight: 700;
+            color: #78350f;
+            font-family: 'Courier New', monospace;
+        }
+
+        .offline-indicator {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>🚐 PRVS Tech Check-In</h1>
+            <p>Patriots RV Services</p>
+        </div>
+
+        <div id="content" class="loading">
+            Loading RO details...
+        </div>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        // Configuration
+        const GOOGLE_CONFIG = {
+            CLIENT_ID: '971946834908-fqhmdrie6ntt0mmmbh4rkpaop8edvgr8.apps.googleusercontent.com',
+            SPREADSHEET_ID: '1Nkf_BoqDhanJRCyeqIerF-Te_Z_R0h3mZelcgTjS62Y'
+        };
+
+        let tokenClient;
+        let accessToken = null;
+        let currentUser = null;
+        let roData = null;
+        let currentSession = null;
+        let timerInterval = null;
+
+        // Parse URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const roId = urlParams.get('ro');
+        const customerName = urlParams.get('customer');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', init);
+
+        function init() {
+            console.log('Check-in page loaded for RO:', roId);
+            
+            if (!roId) {
+                showError('No RO specified. Please scan a valid QR code.');
+                return;
+            }
+
+            // Check for saved session
+            loadLocalSession();
+            
+            // Initialize Google Sign-In
+            initGoogleAuth();
+        }
+
+        function initGoogleAuth() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_CONFIG.CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+                callback: handleAuthCallback,
+            });
+        }
+
+        function handleAuthCallback(response) {
+            if (response.error) {
+                console.error('Auth error:', response.error);
+                showError('Authentication failed. Please try again.');
+                return;
+            }
+            
+            accessToken = response.access_token;
+            getCurrentUser();
+        }
+
+        async function getCurrentUser() {
+            try {
+                const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                
+                if (response.ok) {
+                    const userInfo = await response.json();
+                    currentUser = {
+                        email: userInfo.email,
+                        name: userInfo.name || userInfo.email.split('@')[0]
+                    };
+                    
+                    console.log('Logged in as:', currentUser.name);
+                    loadRODetails();
+                } else {
+                    requestSignIn();
+                }
+            } catch (error) {
+                console.error('Error getting user:', error);
+                requestSignIn();
+            }
+        }
+
+        function requestSignIn() {
+            document.getElementById('content').innerHTML = `
+                <div>
+                    <h2 style="margin-bottom: 20px; color: #1e3a8a;">Sign In Required</h2>
+                    <p style="margin-bottom: 20px; color: #64748b;">Please sign in with your Google account to continue.</p>
+                    <button class="btn btn-start" onclick="tokenClient.requestAccessToken()">
+                        Sign In with Google
+                    </button>
+                </div>
+            `;
+        }
+
+        function loadLocalSession() {
+            const savedSession = localStorage.getItem(`session_${roId}`);
+            if (savedSession) {
+                currentSession = JSON.parse(savedSession);
+                console.log('Loaded saved session:', currentSession);
+            }
+        }
+
+        function saveLocalSession() {
+            if (currentSession) {
+                localStorage.setItem(`session_${roId}`, JSON.stringify(currentSession));
+            } else {
+                localStorage.removeItem(`session_${roId}`);
+            }
+        }
+
+        async function loadRODetails() {
+            // For now, use URL params
+            // In production, this would fetch from Google Sheets
+            roData = {
+                id: roId,
+                customer: customerName,
+                status: 'In Progress',
+                repairType: 'Unknown'
+            };
+            
+            renderInterface();
+        }
+
+        function renderInterface() {
+            const isCheckedIn = currentSession && !currentSession.checkOut;
+            
+            let html = `
+                <div class="ro-info">
+                    <h2>🚐 ${roData.customer || 'Unknown Customer'}</h2>
+                    <div class="info-row">
+                        <span class="info-label">RO ID:</span>
+                        <span class="info-value">${roData.id}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Status:</span>
+                        <span class="info-value">${roData.status}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Tech:</span>
+                        <span class="info-value">${currentUser.name}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Work Status:</span>
+                        <span class="status-badge ${isCheckedIn ? 'checked-in' : 'checked-out'}">
+                            ${isCheckedIn ? '✓ Checked In' : 'Checked Out'}
+                        </span>
+                    </div>
+                </div>
+            `;
+
+            if (isCheckedIn) {
+                html += `
+                    <div class="timer">
+                        <h3>Time on Job</h3>
+                        <div class="timer-display" id="timerDisplay">00:00:00</div>
+                    </div>
+                `;
+            }
+
+            if (!navigator.onLine) {
+                html += `
+                    <div class="offline-indicator">
+                        ⚠️ Offline - Changes will sync when online
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="action-buttons">
+                    ${!isCheckedIn ? `
+                        <button class="btn btn-start" onclick="checkIn()">
+                            ▶️ Start Work
+                        </button>
+                    ` : `
+                        <button class="btn btn-end" onclick="checkOut()">
+                            ⏹️ End Work
+                        </button>
+                    `}
+                </div>
+            `;
+
+            document.getElementById('content').innerHTML = html;
+
+            if (isCheckedIn) {
+                startTimer();
+            }
+        }
+
+        function checkIn() {
+            currentSession = {
+                roId: roId,
+                tech: currentUser.name,
+                techEmail: currentUser.email,
+                checkIn: new Date().toISOString(),
+                checkOut: null
+            };
+            
+            saveLocalSession();
+            syncToSheets();
+            renderInterface();
+        }
+
+        function checkOut() {
+            if (!currentSession) return;
+            
+            currentSession.checkOut = new Date().toISOString();
+            const duration = calculateDuration(currentSession.checkIn, currentSession.checkOut);
+            currentSession.duration = duration;
+            
+            saveLocalSession();
+            syncToSheets();
+            
+            // Show completion message
+            alert(`Work session complete!\nDuration: ${formatDuration(duration)}`);
+            
+            currentSession = null;
+            saveLocalSession();
+            renderInterface();
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                const now = new Date();
+                const start = new Date(currentSession.checkIn);
+                const elapsed = Math.floor((now - start) / 1000);
+                
+                const hours = Math.floor(elapsed / 3600);
+                const minutes = Math.floor((elapsed % 3600) / 60);
+                const seconds = elapsed % 60;
+                
+                const display = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+                document.getElementById('timerDisplay').textContent = display;
+            }, 1000);
+        }
+
+        function pad(num) {
+            return num.toString().padStart(2, '0');
+        }
+
+        function calculateDuration(start, end) {
+            const startTime = new Date(start);
+            const endTime = new Date(end);
+            return Math.floor((endTime - startTime) / 60000); // minutes
+        }
+
+        function formatDuration(minutes) {
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            return `${hours}h ${mins}m`;
+        }
+
+        async function syncToSheets() {
+            // TODO: Write to Time Logs sheet
+            console.log('Syncing to sheets:', currentSession);
+            
+            // For now, just save locally
+            // Will implement Google Sheets API call next
+        }
+
+        function showError(message) {
+            document.getElementById('content').innerHTML = `
+                <div class="error">
+                    <strong>Error:</strong> ${message}
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
