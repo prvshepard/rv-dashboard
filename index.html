@@ -2520,6 +2520,14 @@
 
         // Generate QR codes for all ROs
         function generateAllQRCodes(filteredData) {
+            // Check if QR library is loaded
+            if (typeof qrcode === 'undefined') {
+                console.warn('QR library not loaded yet, retrying...');
+                setTimeout(() => generateAllQRCodes(filteredData), 200);
+                return;
+            }
+            
+            console.log('Generating QR codes for', filteredData.length, 'ROs');
             filteredData.forEach((ro, index) => {
                 const canvas = document.getElementById(`qr-${index}`);
                 if (canvas) {
@@ -2533,21 +2541,55 @@
             const ctx = canvas.getContext('2d');
             
             // Create unique RO ID from customer name + date
-            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived || 'NODOCDATE'}`;
+            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived || 'NODATE'}`;
             
             // QR code URL - points to check-in page
             const checkInURL = `https://prvshepard.github.io/rv-dashboard/checkin.html?ro=${encodeURIComponent(roId)}&customer=${encodeURIComponent(ro.customerName)}`;
             
-            // Generate QR code using QRCode library
-            // Clear canvas first
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            console.log('Generating QR for:', checkInURL);
             
-            // Simple QR generation using canvas API
-            // We'll use a library-free approach for now
-            drawQRPlaceholder(ctx, canvas.width, canvas.height, roId);
+            try {
+                // Create QR code using qrcode-generator library
+                const qr = qrcode(0, 'M'); // Type 0 (auto), Error correction level M
+                qr.addData(checkInURL);
+                qr.make();
+                
+                // Get module count (size of QR matrix)
+                const moduleCount = qr.getModuleCount();
+                const cellSize = Math.floor(canvas.width / moduleCount);
+                const offset = Math.floor((canvas.width - (cellSize * moduleCount)) / 2);
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Fill white background
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw QR code modules
+                ctx.fillStyle = '#000000';
+                for (let row = 0; row < moduleCount; row++) {
+                    for (let col = 0; col < moduleCount; col++) {
+                        if (qr.isDark(row, col)) {
+                            ctx.fillRect(
+                                offset + (col * cellSize),
+                                offset + (row * cellSize),
+                                cellSize,
+                                cellSize
+                            );
+                        }
+                    }
+                }
+                
+                console.log('✓ QR code generated successfully');
+            } catch (error) {
+                console.error('Error generating QR code:', error);
+                // Fallback to placeholder
+                drawQRPlaceholder(ctx, canvas.width, canvas.height, roId);
+            }
         }
 
-        // Temporary QR placeholder (will be replaced with actual QR library)
+        // Fallback QR placeholder (in case library fails)
         function drawQRPlaceholder(ctx, width, height, text) {
             ctx.fillStyle = 'white';
             ctx.fillRect(0, 0, width, height);
@@ -3474,7 +3516,7 @@
     </div>
 
     <script src="https://accounts.google.com/gsi/client?v=2" async defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" onload="console.log('QR library loaded')"></script>
     <script src="https://apis.google.com/js/api.js?v=2" onload="gapiLoaded()"></script>
     <script>
         // Timeout if Google APIs don't load within 10 seconds
