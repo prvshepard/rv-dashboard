@@ -121,10 +121,16 @@
 
         .controls {
             display: flex;
+            flex-direction: column;
             gap: 20px;
             margin-bottom: 40px;
-            flex-wrap: wrap;
             animation: slideDown 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s backwards;
+        }
+        
+        .filters-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
         }
 
         .filter-section {
@@ -1648,35 +1654,37 @@
                 <button id="clearSearch" class="clear-search-btn" style="display: none;">✕ Clear</button>
             </div>
 
-            <div class="filter-section">
-                <label class="filter-label">Filter by Status:</label>
-                <div class="filter-group">
-                    <button class="filter-btn active" data-filter="all" data-type="status">All</button>
-                    <button class="filter-btn" data-filter="Not On Lot" data-type="status">Not On Lot</button>
-                    <button class="filter-btn" data-filter="On Lot" data-type="status">On Lot</button>
-                    <button class="filter-btn" data-filter="In progress" data-type="status">In Progress</button>
-                    <button class="filter-btn" data-filter="Awaiting parts" data-type="status">Awaiting Parts</button>
-                    <button class="filter-btn" data-filter="Quality check" data-type="status">QC</button>
-                    <button class="filter-btn" data-filter="Ready for pickup" data-type="status">Ready</button>
-                    <button class="filter-btn" data-filter="Awaiting Approval" data-type="status">Awaiting Approval</button>
-                    <button class="filter-btn" data-filter="Completed" data-type="status">Completed</button>
-                    <button class="filter-btn" data-filter="Delivered/Cashed Out" data-type="status">Delivered/Cashed Out</button>
+            <div class="filters-row">
+                <div class="filter-section">
+                    <label class="filter-label">Filter by Status:</label>
+                    <div class="filter-group">
+                        <button class="filter-btn active" data-filter="all" data-type="status">All</button>
+                        <button class="filter-btn" data-filter="Not On Lot" data-type="status">Not On Lot</button>
+                        <button class="filter-btn" data-filter="On Lot" data-type="status">On Lot</button>
+                        <button class="filter-btn" data-filter="In progress" data-type="status">In Progress</button>
+                        <button class="filter-btn" data-filter="Awaiting parts" data-type="status">Awaiting Parts</button>
+                        <button class="filter-btn" data-filter="Quality check" data-type="status">QC</button>
+                        <button class="filter-btn" data-filter="Ready for pickup" data-type="status">Ready</button>
+                        <button class="filter-btn" data-filter="Awaiting Approval" data-type="status">Awaiting Approval</button>
+                        <button class="filter-btn" data-filter="Completed" data-type="status">Completed</button>
+                        <button class="filter-btn" data-filter="Delivered/Cashed Out" data-type="status">Delivered/Cashed Out</button>
+                    </div>
                 </div>
-            </div>
 
-            <div class="filter-section">
-                <label class="filter-label">Filter by Repair Type:</label>
-                <div class="filter-group">
-                    <button class="filter-btn active" data-filter="all" data-type="repair">All</button>
-                    <button class="filter-btn" data-filter="Roof" data-type="repair">Roof</button>
-                    <button class="filter-btn" data-filter="Solar" data-type="repair">Solar</button>
-                    <button class="filter-btn" data-filter="Vroom" data-type="repair">Vroom</button>
-                    <button class="filter-btn" data-filter="Paint and Body" data-type="repair">Paint & Body</button>
-                    <button class="filter-btn" data-filter="Repairs" data-type="repair">Repairs</button>
-                    <button class="filter-btn" data-filter="Multi" data-type="repair">Multi</button>
-                    <button class="filter-btn" data-filter="TrueTopper" data-type="repair">TrueTopper</button>
-                    <button class="filter-btn" data-filter="Detailing" data-type="repair">Detailing</button>
-                    <button class="filter-btn" data-filter="Chassis" data-type="repair">Chassis</button>
+                <div class="filter-section">
+                    <label class="filter-label">Filter by Repair Type:</label>
+                    <div class="filter-group">
+                        <button class="filter-btn active" data-filter="all" data-type="repair">All</button>
+                        <button class="filter-btn" data-filter="Roof" data-type="repair">Roof</button>
+                        <button class="filter-btn" data-filter="Solar" data-type="repair">Solar</button>
+                        <button class="filter-btn" data-filter="Vroom" data-type="repair">Vroom</button>
+                        <button class="filter-btn" data-filter="Paint and Body" data-type="repair">Paint & Body</button>
+                        <button class="filter-btn" data-filter="Repairs" data-type="repair">Repairs</button>
+                        <button class="filter-btn" data-filter="Multi" data-type="repair">Multi</button>
+                        <button class="filter-btn" data-filter="TrueTopper" data-type="repair">TrueTopper</button>
+                        <button class="filter-btn" data-filter="Detailing" data-type="repair">Detailing</button>
+                        <button class="filter-btn" data-filter="Chassis" data-type="repair">Chassis</button>
+                    </div>
                 </div>
             </div>
         </div>
