@@ -2574,7 +2574,64 @@
 
         // Open QR modal for printing
         function openQRModal(index) {
-            alert('QR Modal - Coming soon! Will show enlarged QR code for printing.');
+            const sorted = [...currentData].map(ro => ({
+                ...ro,
+                priorityScore: calculatePriority(ro)
+            })).sort((a, b) => b.priorityScore - a.priorityScore);
+            
+            const ro = sorted[index];
+            if (!ro) return;
+            
+            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived || 'NODATE'}`;
+            const checkInURL = `https://prvshepard.github.io/rv-dashboard/checkin.html?ro=${encodeURIComponent(roId)}&customer=${encodeURIComponent(ro.customerName)}`;
+            
+            // Create modal overlay
+            const modalHTML = `
+                <div id="qrModalOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;" onclick="closeQRModal(event)">
+                    <div style="background: white; border-radius: 16px; padding: 40px; max-width: 500px; width: 100%; text-align: center;" onclick="event.stopPropagation()">
+                        <h2 style="margin-bottom: 20px; color: #1e293b; font-family: 'Barlow Condensed', sans-serif;">QR Code - Check In/Out</h2>
+                        <div style="background: white; padding: 20px; border-radius: 12px; display: inline-block; border: 2px solid #e2e8f0;">
+                            <canvas id="qrModalCanvas" width="300" height="300"></canvas>
+                        </div>
+                        <div style="margin-top: 20px; font-size: 1.2rem; font-weight: 700; color: #1e293b;">${ro.customerName}</div>
+                        <div style="margin-top: 8px; font-size: 0.9rem; color: #64748b; font-family: 'JetBrains Mono', monospace;">${roId}</div>
+                        <div style="margin-top: 20px; padding: 12px; background: #f1f5f9; border-radius: 8px; font-size: 0.85rem; color: #475569;">
+                            Scan this QR code to check in/out of this repair order
+                        </div>
+                        <div style="margin-top: 20px; display: flex; gap: 12px; justify-content: center;">
+                            <button onclick="printQRLabel(${index}); closeQRModal();" style="padding: 12px 24px; background: #0A84FF; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">
+                                🖨️ Print Label
+                            </button>
+                            <button onclick="closeQRModal()" style="padding: 12px 24px; background: #64748b; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add modal to page
+            const modalDiv = document.createElement('div');
+            modalDiv.innerHTML = modalHTML;
+            document.body.appendChild(modalDiv);
+            
+            // Draw QR code on modal canvas
+            setTimeout(() => {
+                const modalCanvas = document.getElementById('qrModalCanvas');
+                if (modalCanvas) {
+                    const smallCanvas = document.getElementById(`qr-${index}`);
+                    const ctx = modalCanvas.getContext('2d');
+                    ctx.drawImage(smallCanvas, 0, 0, 300, 300);
+                }
+            }, 100);
+        }
+
+        function closeQRModal(event) {
+            if (event && event.target.id !== 'qrModalOverlay') return;
+            const modal = document.getElementById('qrModalOverlay');
+            if (modal) {
+                modal.parentElement.remove();
+            }
         }
 
         // Print QR label
