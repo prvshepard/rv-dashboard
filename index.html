@@ -2557,11 +2557,12 @@
                 
                 // Create a temporary container for QRCode.js
                 const tempDiv = document.createElement('div');
-                tempDiv.style.display = 'none';
+                tempDiv.style.position = 'absolute';
+                tempDiv.style.left = '-9999px';
                 document.body.appendChild(tempDiv);
                 
                 // Generate QR code using QRCode.js
-                const qrcode = new QRCode(tempDiv, {
+                const qrcodeObj = new QRCode(tempDiv, {
                     text: checkInURL,
                     width: 300,
                     height: 300,
@@ -2570,19 +2571,32 @@
                     correctLevel: QRCode.CorrectLevel.M
                 });
                 
-                // Wait for QR to be generated, then copy to canvas
-                setTimeout(() => {
+                // Wait for image to be generated and loaded
+                const checkImage = setInterval(() => {
                     const img = tempDiv.querySelector('img');
-                    if (img && img.complete) {
+                    if (img && img.complete && img.naturalHeight > 0) {
+                        clearInterval(checkImage);
+                        
+                        // Draw to canvas
                         ctx.drawImage(img, 0, 0, canvasElement.width, canvasElement.height);
                         console.log('✓ QR code generated and drawn to canvas');
+                        
                         canvasElement.dataset.ready = 'true';
                         canvasElement.dataset.url = checkInURL;
+                        
+                        // Clean up
                         document.body.removeChild(tempDiv);
-                    } else {
-                        console.error('QR code image not ready');
                     }
-                }, 200);
+                }, 50);
+                
+                // Timeout after 3 seconds
+                setTimeout(() => {
+                    clearInterval(checkImage);
+                    if (!canvasElement.dataset.ready) {
+                        console.error('QR code generation timed out');
+                        document.body.removeChild(tempDiv);
+                    }
+                }, 3000);
                 
                 console.log('===================');
             } catch (error) {
