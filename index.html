@@ -2591,14 +2591,14 @@
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(logoX - 4, logoY - 4, logoSize + 8, logoSize + 8);
                 
-                // Draw logo (load from URL)
+                // Draw logo (load from GitHub)
                 const logo = new Image();
-                logo.crossOrigin = 'anonymous';
                 logo.onload = function() {
                     ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+                    console.log('✓ Logo loaded successfully from GitHub');
                 };
-                logo.onerror = function() {
-                    console.warn('Logo failed to load, using text instead');
+                logo.onerror = function(err) {
+                    console.warn('Logo failed to load, using text instead. Error:', err);
                     // Fallback: draw "PRVS" text
                     ctx.fillStyle = '#1e3a8a';
                     ctx.font = 'bold 12px Arial';
@@ -2606,7 +2606,8 @@
                     ctx.textBaseline = 'middle';
                     ctx.fillText('PRVS', canvas.width / 2, canvas.height / 2);
                 };
-                logo.src = 'https://drive.google.com/uc?export=view&id=1nCIawzkB2q_AnCEhnpdC_RGHc4bXqIv-';
+                // Load from GitHub (same domain, no CORS issues)
+                logo.src = 'https://prvshepard.github.io/rv-dashboard/logo.png';
                 
                 console.log('✓ QR code generated successfully');
             } catch (error) {
