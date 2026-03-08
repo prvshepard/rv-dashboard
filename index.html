@@ -2404,6 +2404,7 @@
                                 <canvas id="qr-${sorted.indexOf(ro)}" class="qr-canvas"></canvas>
                             </div>
                             <div class="qr-label">${ro.customerName || 'Unknown'}</div>
+                            <div class="qr-label" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: -4px;">${ro.rv || 'RV Not Specified'}</div>
                             <button class="print-qr-btn" onclick="printQRLabel(${sorted.indexOf(ro)})" title="Print QR Label">
                                 🖨️ Print Label
                             </button>
@@ -2550,7 +2551,7 @@
             
             try {
                 // Create QR code using qrcode-generator library
-                const qr = qrcode(0, 'M'); // Type 0 (auto), Error correction level M
+                const qr = qrcode(0, 'H'); // Type 0 (auto), Error correction level H (30% recovery - needed for logo)
                 qr.addData(checkInURL);
                 qr.make();
                 
@@ -2580,6 +2581,32 @@
                         }
                     }
                 }
+                
+                // Add logo in center
+                const logoSize = Math.floor(canvas.width * 0.25); // 25% of QR size
+                const logoX = (canvas.width - logoSize) / 2;
+                const logoY = (canvas.height - logoSize) / 2;
+                
+                // White background for logo
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(logoX - 4, logoY - 4, logoSize + 8, logoSize + 8);
+                
+                // Draw logo (load from URL)
+                const logo = new Image();
+                logo.crossOrigin = 'anonymous';
+                logo.onload = function() {
+                    ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+                };
+                logo.onerror = function() {
+                    console.warn('Logo failed to load, using text instead');
+                    // Fallback: draw "PRVS" text
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('PRVS', canvas.width / 2, canvas.height / 2);
+                };
+                logo.src = 'https://drive.google.com/uc?export=view&id=1nCIawzkB2q_AnCEhnpdC_RGHc4bXqIv-';
                 
                 console.log('✓ QR code generated successfully');
             } catch (error) {
@@ -2636,6 +2663,7 @@
                             <canvas id="qrModalCanvas" width="300" height="300"></canvas>
                         </div>
                         <div style="margin-top: 20px; font-size: 1.2rem; font-weight: 700; color: #1e293b;">${ro.customerName}</div>
+                        <div style="margin-top: 8px; font-size: 1rem; font-weight: 600; color: #475569;">${ro.rv || 'RV Not Specified'}</div>
                         <div style="margin-top: 8px; font-size: 0.9rem; color: #64748b; font-family: 'JetBrains Mono', monospace;">${roId}</div>
                         <div style="margin-top: 20px; padding: 12px; background: #f1f5f9; border-radius: 8px; font-size: 0.85rem; color: #475569;">
                             Scan this QR code to check in/out of this repair order
@@ -2715,6 +2743,13 @@
                             text-align: center;
                             margin-top: 10px;
                         }
+                        .rv-make {
+                            font-size: 16px;
+                            color: #333;
+                            text-align: center;
+                            margin-top: 5px;
+                            font-weight: 600;
+                        }
                         .ro-id {
                             font-size: 14px;
                             color: #666;
@@ -2727,6 +2762,7 @@
                     <h2>Scan to Check In/Out</h2>
                     <canvas id="printQR" width="300" height="300"></canvas>
                     <div class="customer-name">${ro.customerName}</div>
+                    <div class="rv-make">${ro.rv || 'RV Not Specified'}</div>
                     <div class="ro-id">${roId}</div>
                 </body>
                 </html>
