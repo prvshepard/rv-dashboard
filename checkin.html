@@ -235,6 +235,18 @@
         function init() {
             console.log('Check-in page loaded for RO:', roId);
             
+            // Add debug info to page
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div style="padding: 20px; font-family: monospace; font-size: 12px; background: #f0f0f0;">
+                    <h3>Debug Info:</h3>
+                    <div>URL: ${window.location.href}</div>
+                    <div>RO ID from URL: ${roId || 'NULL'}</div>
+                    <div>Customer from URL: ${customerName || 'NULL'}</div>
+                    <div>roData: ${roData ? JSON.stringify(roData) : 'NULL'}</div>
+                </div>
+            `;
+            
             if (!roId) {
                 showError('No RO specified. Please scan a valid QR code.');
                 return;
@@ -323,6 +335,9 @@
             console.log('roId:', roId);
             console.log('customerName:', customerName);
             
+            const app = document.getElementById('app');
+            app.innerHTML += `<div style="padding: 10px; background: #ffffcc; margin-top: 10px;">loadRODetailsFromURL called...</div>`;
+            
             // Extract customer name from RO ID (format: RO-Customer-Name-Date)
             let extractedCustomer = 'Unknown Customer';
             if (roId && roId.startsWith('RO-')) {
@@ -336,6 +351,8 @@
             
             console.log('Extracted customer:', extractedCustomer);
             
+            app.innerHTML += `<div style="padding: 10px; background: #ccffcc; margin-top: 10px;">Extracted customer: ${extractedCustomer}</div>`;
+            
             // Set RO data from URL
             roData = {
                 id: roId,
@@ -345,16 +362,19 @@
             };
             
             console.log('RO Data set to:', roData);
+            app.innerHTML += `<div style="padding: 10px; background: #ccccff; margin-top: 10px;">roData set to: ${JSON.stringify(roData)}</div>`;
             
             // Render interface immediately with RO data (before auth)
+            app.innerHTML += `<div style="padding: 10px; background: #ffcccc; margin-top: 10px;">About to call renderInterface()...</div>`;
             renderInterface();
             
             // Check if we have Google API loaded
             if (typeof google === 'undefined') {
                 console.log('Google API not loaded yet, showing sign-in prompt');
-                // requestSignIn already called by renderInterface
+                app.innerHTML += `<div style="padding: 10px; background: #ffccff; margin-top: 10px;">Google API not loaded yet</div>`;
             } else {
                 console.log('Google API loaded, initializing auth');
+                app.innerHTML += `<div style="padding: 10px; background: #ccffff; margin-top: 10px;">Google API loaded, calling initGoogleAuth()</div>`;
                 initGoogleAuth();
             }
         }
