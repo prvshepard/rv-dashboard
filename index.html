@@ -1629,6 +1629,11 @@
         let currentStatusFilters = []; // Changed to array for multi-select
         let currentRepairFilter = 'all';
         let currentSearchFilter = ''; // Customer name search
+        
+        // Helper function to get RO from filtered view
+        function getROFromFilteredView(index) {
+            return currentFilteredData[index];
+        }
 
         // Update RO Status
         // Status to Progress mapping
@@ -1659,12 +1664,7 @@
             dropdown.disabled = true;
 
             try {
-                // Get the sorted data to find the correct RO
                 const ro = currentFilteredData[index];
-                    ...ro,
-                    
-                
-                
                 
                 if (!ro) {
                     console.error('Could not find RO at index:', index);
@@ -2025,14 +2025,9 @@
                     console.log('Drive upload successful, URL:', photoUrl);
                     
                     // Get the current RO data
-                    const sorted = [...currentData].map(ro => ({
-                        ...ro,
-                        priorityScore: calculatePriority(ro)
-                    })).sort((a, b) => b.priorityScore - a.priorityScore);
-                    
-                    const ro = sorted[index];
+                    const ro = currentFilteredData[index];
                     if (!ro) {
-                        console.error('Could not find RO at sorted index:', index);
+                        console.error('Could not find RO at index:', index);
                         alert('Error: Could not find the repair order. Please refresh and try again.');
                         uploadBtn.textContent = originalText;
                         uploadBtn.disabled = false;
@@ -3286,15 +3281,7 @@
             try {
                 console.log('=== openEditRO called with index:', index);
                 
-                // Get the sorted data to find the correct RO
-                const sorted = [...currentData].map(ro => ({
-                    ...ro,
-                    priorityScore: calculatePriority(ro)
-                })).sort((a, b) => b.priorityScore - a.priorityScore);
-                
-                console.log('Sorted data length:', sorted.length);
-                
-                const ro = sorted[index];
+                const ro = currentFilteredData[index];
                 if (!ro) {
                     console.error('Could not find RO at index:', index);
                     alert('Error: Could not find the repair order.');
@@ -3623,9 +3610,11 @@
     <script>
         // Timeout if Google APIs don't load within 10 seconds
         setTimeout(function() {
-            if (!gapiInited || !gisInited) {
-                console.error('Google APIs failed to load within 10 seconds');
-                alert('Google APIs are taking too long to load. Please:\n1. Clear your browser cache (Cmd+Shift+R)\n2. Refresh the page\n3. If that doesn\'t work, try a different browser or incognito mode');
+            if (typeof gapiInited !== 'undefined' && typeof gisInited !== 'undefined') {
+                if (!gapiInited || !gisInited) {
+                    console.error('Google APIs failed to load within 10 seconds');
+                    alert('Google APIs are taking too long to load. Please:\n1. Clear your browser cache (Cmd+Shift+R)\n2. Refresh the page\n3. If that doesn\'t work, try a different browser or incognito mode');
+                }
             }
         }, 10000);
     </script>
