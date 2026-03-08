@@ -1626,6 +1626,9 @@
                     <option value="regular" selected>Regular</option>
                     <option value="expanded">Expanded</option>
                 </select>
+                <button id="adminSettingsBtn" onclick="openAdminSettingsModal()" style="display: none; padding: 10px 16px; background: rgba(255, 255, 255, 0.2); color: white; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 8px; cursor: pointer; font-weight: 600; margin-left: 12px;">
+                    ⚙️ Admin Settings
+                </button>
             </div>
             
             <div class="search-section">
@@ -2029,6 +2032,19 @@
                 currentViewMode = preset;
                 saveViewPreferences();
                 renderBoard();
+            }
+        }
+        
+        function saveCurrentAsPreset(presetName) {
+            if (!isAdmin()) {
+                alert('Admin access required');
+                return;
+            }
+            
+            if (viewPresets[presetName]) {
+                viewPresets[presetName] = { ...tileVisibility };
+                console.log(`✅ Saved current configuration as "${presetName}" preset`);
+                alert(`Configuration saved to "${presetName}" preset!\n\nNow click "Admin Settings" → "Export Configuration Code" to make it permanent.`);
             }
         }
         
@@ -3369,7 +3385,13 @@
         
         function updateViewModeDropdown() {
             const selector = document.getElementById('viewModeSelector');
+            const adminBtn = document.getElementById('adminSettingsBtn');
             if (!selector) return;
+            
+            // Show/hide admin settings button
+            if (adminBtn) {
+                adminBtn.style.display = isAdmin() ? 'inline-block' : 'none';
+            }
             
             // Check if Custom option already exists
             const hasCustom = Array.from(selector.options).some(opt => opt.value === 'custom');
@@ -3990,6 +4012,24 @@
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-bottom: 24px; max-height: 400px; overflow-y: auto; padding: 16px; background: #f8fafc; border-radius: 8px;">
                             ${checkboxesHtml}
                         </div>
+                        
+                        ${isAdmin() ? `
+                        <div style="background: #fef3c7; border: 2px solid #f59e0b; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                            <strong style="color: #92400e; font-size: 0.9rem;">💾 Save Current Configuration:</strong>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;">
+                                <button onclick="saveCurrentAsPreset('condensed')" style="padding: 8px 12px; background: white; color: #1e293b; border: 2px solid #f59e0b; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+                                    Save as Condensed
+                                </button>
+                                <button onclick="saveCurrentAsPreset('regular')" style="padding: 8px 12px; background: white; color: #1e293b; border: 2px solid #f59e0b; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+                                    Save as Regular
+                                </button>
+                                <button onclick="saveCurrentAsPreset('expanded')" style="padding: 8px 12px; background: white; color: #1e293b; border: 2px solid #f59e0b; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+                                    Save as Expanded
+                                </button>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
                         <div style="display: flex; gap: 12px; margin-bottom: 16px;">
                             <button onclick="applyViewPreset('condensed'); updateCustomViewChecks();" style="flex: 1; padding: 10px 16px; background: #f8fafc; color: #1e293b; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
                                 Condensed Preset
@@ -4037,6 +4077,172 @@
                     checkbox.checked = tileVisibility[key];
                 }
             });
+        }
+        
+        function openAdminSettingsModal() {
+            if (!isAdmin()) {
+                alert('Admin access required');
+                return;
+            }
+            
+            // Generate configuration code
+            const configCode = generatePresetCode();
+            
+            const modalHTML = `
+                <div id="adminSettingsModalOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;" onclick="closeAdminSettingsModal(event)">
+                    <div style="background: white; border-radius: 16px; padding: 40px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+                        <h2 style="margin-bottom: 12px; color: #1e293b; font-family: 'Barlow Condensed', sans-serif;">⚙️ Admin Settings - View Presets</h2>
+                        <p style="color: #64748b; margin-bottom: 24px;">
+                            Export your custom view configurations to make them permanent for all users.
+                        </p>
+                        
+                        <div style="background: #fef3c7; border: 2px solid #f59e0b; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                            <h3 style="margin: 0 0 8px 0; color: #92400e; font-size: 1rem;">📋 How to Save Your Presets:</h3>
+                            <ol style="margin: 0; padding-left: 20px; color: #78350f; font-size: 0.9rem; line-height: 1.6;">
+                                <li>Configure your presets using "Custom... (Admin)"</li>
+                                <li>Click "Export Configuration Code" below</li>
+                                <li>Copy the generated JavaScript code</li>
+                                <li>In your HTML file, find the <code style="background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px;">viewPresets</code> object</li>
+                                <li>Replace it with your exported code</li>
+                                <li>Save and upload to GitHub</li>
+                                <li>All users will now see your configured presets!</li>
+                            </ol>
+                        </div>
+                        
+                        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border: 2px solid #e2e8f0; margin-bottom: 20px;">
+                            <h3 style="margin: 0 0 12px 0; color: #1e293b; font-size: 1rem;">Current Preset Configurations:</h3>
+                            
+                            <div style="margin-bottom: 16px;">
+                                <strong style="color: #667eea;">Condensed View:</strong>
+                                <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
+                                    ${Object.entries(viewPresets.condensed).filter(([k,v]) => v).map(([k]) => k).join(', ')}
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom: 16px;">
+                                <strong style="color: #667eea;">Regular View:</strong>
+                                <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
+                                    ${Object.entries(viewPresets.regular).filter(([k,v]) => v).map(([k]) => k).join(', ')}
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <strong style="color: #667eea;">Expanded View:</strong>
+                                <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
+                                    ${Object.entries(viewPresets.expanded).filter(([k,v]) => v).map(([k]) => k).join(', ')}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button onclick="exportPresetConfiguration()" style="width: 100%; padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; margin-bottom: 12px;">
+                            📤 Export Configuration Code
+                        </button>
+                        
+                        <button onclick="closeAdminSettingsModal()" style="width: 100%; padding: 12px 24px; background: #64748b; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600;">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            const modalDiv = document.createElement('div');
+            modalDiv.innerHTML = modalHTML;
+            document.body.appendChild(modalDiv);
+        }
+        
+        function closeAdminSettingsModal(event) {
+            if (event) event.stopPropagation();
+            const modal = document.getElementById('adminSettingsModalOverlay');
+            if (modal) {
+                modal.remove();
+            }
+        }
+        
+        function generatePresetCode() {
+            return `const viewPresets = ${JSON.stringify(viewPresets, null, 12)};`;
+        }
+        
+        function exportPresetConfiguration() {
+            const code = generatePresetCode();
+            
+            // Create a modal to show the code
+            const codeModalHTML = `
+                <div id="codeExportModalOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.9); z-index: 10001; display: flex; align-items: center; justify-content: center; padding: 20px;" onclick="closeCodeExportModal(event)">
+                    <div style="background: white; border-radius: 16px; padding: 40px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+                        <h2 style="margin-bottom: 12px; color: #1e293b; font-family: 'Barlow Condensed', sans-serif;">📤 Export Configuration</h2>
+                        <p style="color: #64748b; margin-bottom: 16px;">
+                            Download your preset configuration as a JavaScript file, then I'll help you integrate it.
+                        </p>
+                        
+                        <div style="position: relative;">
+                            <textarea id="exportedCode" readonly style="width: 100%; height: 300px; font-family: 'Courier New', monospace; font-size: 0.85rem; padding: 16px; background: #1e293b; color: #f8fafc; border: 2px solid #334155; border-radius: 8px; resize: vertical;">${code}</textarea>
+                        </div>
+                        
+                        <button onclick="downloadPresetFile()" style="width: 100%; padding: 16px 24px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 700; margin-top: 16px; margin-bottom: 12px;">
+                            💾 Download preset-config.js
+                        </button>
+                        
+                        <div style="background: #dbeafe; border: 2px solid #3b82f6; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                            <strong style="color: #1e40af;">💡 What to do next:</strong>
+                            <ol style="margin: 8px 0 0 0; padding-left: 20px; color: #1e3a8a; font-size: 0.9rem; line-height: 1.6;">
+                                <li>Click "Download preset-config.js" above</li>
+                                <li>File will save to your Downloads folder</li>
+                                <li>Tell me you've downloaded it</li>
+                                <li>I'll integrate it into your HTML automatically!</li>
+                            </ol>
+                        </div>
+                        
+                        <button onclick="closeCodeExportModal()" style="width: 100%; padding: 12px 24px; background: #64748b; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600;">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            const modalDiv = document.createElement('div');
+            modalDiv.innerHTML = codeModalHTML;
+            document.body.appendChild(modalDiv);
+        }
+        
+        function downloadPresetFile() {
+            const code = generatePresetCode();
+            
+            // Create blob with the configuration
+            const blob = new Blob([code], { type: 'application/javascript' });
+            
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'preset-config.js';
+            
+            // Trigger download
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // Show confirmation
+            const btn = event.target;
+            const originalText = btn.textContent;
+            const originalBg = btn.style.background;
+            btn.textContent = '✅ Downloaded! Send it to me.';
+            btn.style.background = '#10b981';
+            
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = originalBg;
+            }, 3000);
+        }
+        
+        function closeCodeExportModal(event) {
+            if (event) event.stopPropagation();
+            const modal = document.getElementById('codeExportModalOverlay');
+            if (modal) {
+                modal.remove();
+            }
         }
         
         function openEditRO(index) {
