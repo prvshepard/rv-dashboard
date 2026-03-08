@@ -435,6 +435,30 @@
             letter-spacing: 0.05em;
         }
 
+        .edit-ro-btn {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-elevated);
+            border: 2px solid var(--accent-medium);
+            border-radius: 8px;
+            color: var(--accent-medium);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 16px;
+        }
+
+        .edit-ro-btn:hover {
+            background: var(--accent-medium);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 204, 0, 0.3);
+        }
+
         .photo-upload-btn:hover {
             background: var(--accent-low);
             border-color: var(--accent-low);
@@ -2415,6 +2439,10 @@
                                 <div class="note-content">${ro.customerCommunicationNotes || '<span class="placeholder-text">Click Here To Update</span>'}</div>
                             </div>
                         </div>
+                        
+                        <button class="edit-ro-btn" onclick="openEditRO(${sorted.indexOf(ro)})">
+                            ✏️ Edit RO
+                        </button>
                     </div>
                 `;
             }).join('');
@@ -2738,6 +2766,75 @@
             }
         }
 
+        async function updateROInSheets(roIndex, formData) {
+            try {
+                const rowNumber = roIndex + 2; // +2 for header and 0-based index
+                
+                const values = [[
+                    formData.customerName,
+                    formData.customerPhone || '',
+                    formData.customerEmail || '',
+                    formData.customerAddress || '',
+                    formData.rv,
+                    currentData[roIndex].rvPhotoUrl || '', // Keep existing photo URL
+                    formData.repairType,
+                    formData.repairDescription,
+                    formData.technicianAssigned || '',
+                    formData.dateReceived, // Keep original date received
+                    formData.percentComplete || 0,
+                    formData.dollarValue || 0,
+                    formData.status,
+                    formData.urgency,
+                    formData.customerType,
+                    formData.promisedDate || '',
+                    formData.roStatusNotes || '',
+                    formData.customerCommunicationNotes || ''
+                ]];
+
+                const range = `Sheet1!A${rowNumber}:R${rowNumber}`;
+                
+                const response = await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: range,
+                    valueInputOption: 'RAW',
+                    resource: { values }
+                });
+
+                console.log('RO updated in sheet:', response);
+                
+                // Update local data
+                const userName = currentUser ? currentUser.name : 'Unknown User';
+                currentData[roIndex] = {
+                    customerName: formData.customerName,
+                    customerPhone: formData.customerPhone || '',
+                    customerEmail: formData.customerEmail || '',
+                    customerAddress: formData.customerAddress || '',
+                    rv: formData.rv,
+                    rvPhotoUrl: currentData[roIndex].rvPhotoUrl || '',
+                    repairType: formData.repairType,
+                    repairDescription: formData.repairDescription,
+                    technicianAssigned: formData.technicianAssigned || '',
+                    dateReceived: formData.dateReceived,
+                    percentComplete: parseInt(formData.percentComplete) || 0,
+                    dollarValue: parseFloat(formData.dollarValue) || 0,
+                    status: formData.status,
+                    urgency: formData.urgency,
+                    customerType: formData.customerType,
+                    promisedDate: formData.promisedDate || '',
+                    roStatusNotes: formData.roStatusNotes || '',
+                    customerCommunicationNotes: formData.customerCommunicationNotes || ''
+                };
+                
+                console.log('✓ RO updated by', userName);
+                renderBoard();
+                return true;
+            } catch (err) {
+                console.error('Error updating RO in Sheets:', err);
+                alert('Error updating RO. Check console for details.');
+                return false;
+            }
+        }
+
         async function appendToSheets(formData) {
             try {
                 // Use today's date as the received date for new entries
@@ -2785,6 +2882,65 @@
         }
 
         // Modal Controls
+        let editingROIndex = null; // Track which RO is being edited
+
+        function openEditRO(index) {
+            // Get the sorted data to find the correct RO
+            const sorted = [...currentData].map(ro => ({
+                ...ro,
+                priorityScore: calculatePriority(ro)
+            })).sort((a, b) => b.priorityScore - a.priorityScore);
+            
+            const ro = sorted[index];
+            if (!ro) {
+                alert('Error: Could not find the repair order.');
+                return;
+            }
+
+            // Store which RO we're editing
+            editingROIndex = currentData.findIndex(item => 
+                item.customerName === ro.customerName && 
+                item.dateReceived === ro.dateReceived
+            );
+
+            // Get form elements
+            const form = document.getElementById('newROForm');
+            const modalTitle = document.querySelector('#modalOverlay h2');
+            const submitBtn = document.querySelector('#newROForm button[type="submit"]');
+
+            // Change modal title and button text
+            modalTitle.textContent = 'Edit Repair Order';
+            submitBtn.textContent = 'Update RO';
+
+            // Populate form fields
+            form.elements['customerName'].value = ro.customerName || '';
+            form.elements['customerPhone'].value = ro.customerPhone || '';
+            form.elements['customerEmail'].value = ro.customerEmail || '';
+            form.elements['customerAddress'].value = ro.customerAddress || '';
+            form.elements['rv'].value = ro.rv || '';
+            form.elements['repairDescription'].value = ro.repairDescription || '';
+            form.elements['technicianAssigned'].value = ro.technicianAssigned || '';
+            form.elements['dateReceived'].value = ro.dateReceived || '';
+            form.elements['percentComplete'].value = ro.percentComplete || 0;
+            form.elements['dollarValue'].value = ro.dollarValue || '';
+            form.elements['status'].value = ro.status || '';
+            form.elements['urgency'].value = ro.urgency || '';
+            form.elements['customerType'].value = ro.customerType || '';
+            form.elements['promisedDate'].value = ro.promisedDate || '';
+            form.elements['roStatusNotes'].value = ro.roStatusNotes || '';
+            form.elements['customerCommunicationNotes'].value = ro.customerCommunicationNotes || '';
+
+            // Handle repair type checkboxes
+            const repairTypes = (ro.repairType || '').split(',').map(t => t.trim());
+            const checkboxes = form.querySelectorAll('input[name="repairType"]');
+            checkboxes.forEach(cb => {
+                cb.checked = repairTypes.includes(cb.value);
+            });
+
+            // Open modal
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
         function setupModalListeners() {
             const newROBtn = document.getElementById('newROBtn');
             const modalOverlay = document.getElementById('modalOverlay');
@@ -2816,6 +2972,12 @@
             });
 
             newROBtn.addEventListener('click', () => {
+                // Reset for new RO
+                editingROIndex = null;
+                const modalTitle = document.querySelector('#modalOverlay h2');
+                const submitBtn = document.querySelector('#newROForm button[type="submit"]');
+                modalTitle.textContent = 'New Repair Order';
+                submitBtn.textContent = 'Save RO';
                 modalOverlay.classList.add('active');
             });
 
@@ -2852,11 +3014,23 @@
                 }
                 data.repairType = repairTypes.join(', ');
 
-                const success = await appendToSheets(data);
+                let success;
                 
-                if (success) {
-                    closeModal();
-                    alert('Repair Order saved successfully!');
+                if (editingROIndex !== null) {
+                    // Update existing RO
+                    success = await updateROInSheets(editingROIndex, data);
+                    if (success) {
+                        closeModal();
+                        alert('Repair Order updated successfully!');
+                        editingROIndex = null;
+                    }
+                } else {
+                    // Create new RO
+                    success = await appendToSheets(data);
+                    if (success) {
+                        closeModal();
+                        alert('Repair Order saved successfully!');
+                    }
                 }
             });
         }
