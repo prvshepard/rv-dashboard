@@ -442,15 +442,15 @@
                             <p>Please sign in to check in/out</p>
                             <div id="googleSignInDiv"></div>
                         </div>
-                    ` : (!isCheckedIn ? `
-                        <button class="btn btn-start" onclick="checkIn()">
-                            ▶️ Start Work
-                        </button>
-                    ` : `
+                    ` : (isCheckedIn ? `
                         <button class="btn btn-end" onclick="checkOut()">
                             ⏹️ End Work
                         </button>
-                    `}
+                    ` : `
+                        <button class="btn btn-start" onclick="checkIn()">
+                            ▶️ Start Work
+                        </button>
+                    `)}
                 </div>
             `;
 
