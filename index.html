@@ -2522,7 +2522,7 @@
         // Generate QR codes for all ROs
         function generateAllQRCodes(filteredData) {
             // Check if QR library is loaded
-            if (typeof qrcode === 'undefined') {
+            if (typeof QRCode === 'undefined') {
                 console.warn('QR library not loaded yet, retrying...');
                 setTimeout(() => generateAllQRCodes(filteredData), 200);
                 return;
@@ -2538,9 +2538,7 @@
         }
 
         // Generate individual QR code
-        function generateQRCode(canvas, ro, index) {
-            const ctx = canvas.getContext('2d');
-            
+        function generateQRCode(canvasElement, ro, index) {
             // Create unique RO ID from customer name + date
             const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived || 'NODATE'}`;
             
@@ -2553,52 +2551,42 @@
             console.log('URL Length:', checkInURL.length);
             
             try {
-                // Create QR code using qrcode-generator library
-                const qr = qrcode(0, 'L'); // Type 0 (auto), Error correction level L (lowest - creates simplest code)
-                qr.addData(checkInURL);
-                qr.make();
+                // Clear the canvas first
+                const ctx = canvasElement.getContext('2d');
+                ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 
-                // Get module count (size of QR matrix)
-                const moduleCount = qr.getModuleCount();
-                console.log('QR Module Count:', moduleCount);
+                // Create a temporary container for QRCode.js
+                const tempDiv = document.createElement('div');
+                tempDiv.style.display = 'none';
+                document.body.appendChild(tempDiv);
                 
-                const cellSize = Math.floor(canvas.width / moduleCount);
-                const offset = Math.floor((canvas.width - (cellSize * moduleCount)) / 2);
+                // Generate QR code using QRCode.js
+                const qrcode = new QRCode(tempDiv, {
+                    text: checkInURL,
+                    width: 300,
+                    height: 300,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
                 
-                console.log('Cell Size:', cellSize, 'Offset:', offset);
-                
-                // Clear canvas
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                // Fill white background
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw QR code modules
-                ctx.fillStyle = '#000000';
-                for (let row = 0; row < moduleCount; row++) {
-                    for (let col = 0; col < moduleCount; col++) {
-                        if (qr.isDark(row, col)) {
-                            ctx.fillRect(
-                                offset + (col * cellSize),
-                                offset + (row * cellSize),
-                                cellSize,
-                                cellSize
-                            );
-                        }
+                // Wait for QR to be generated, then copy to canvas
+                setTimeout(() => {
+                    const img = tempDiv.querySelector('img');
+                    if (img && img.complete) {
+                        ctx.drawImage(img, 0, 0, canvasElement.width, canvasElement.height);
+                        console.log('✓ QR code generated and drawn to canvas');
+                        canvasElement.dataset.ready = 'true';
+                        canvasElement.dataset.url = checkInURL;
+                        document.body.removeChild(tempDiv);
+                    } else {
+                        console.error('QR code image not ready');
                     }
-                }
+                }, 200);
                 
-                // No logo - mark canvas as ready immediately
-                canvas.dataset.ready = 'true';
-                canvas.dataset.url = checkInURL; // Store URL for testing
-                
-                console.log('✓ QR code generated successfully');
                 console.log('===================');
             } catch (error) {
                 console.error('Error generating QR code:', error);
-                // Fallback to placeholder
-                drawQRPlaceholder(ctx, canvas.width, canvas.height, roId);
             }
         }
 
@@ -3581,7 +3569,7 @@
     </div>
 
     <script src="https://accounts.google.com/gsi/client?v=2" async defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" onload="console.log('QR library loaded')"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="https://apis.google.com/js/api.js?v=2" onload="gapiLoaded()"></script>
     <script>
         // Timeout if Google APIs don't load within 10 seconds
