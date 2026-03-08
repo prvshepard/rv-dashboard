@@ -867,6 +867,55 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+        
+        .time-logs-section {
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            padding: 14px;
+            color: white;
+        }
+        
+        .time-logs-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .time-icon {
+            font-size: 1.2rem;
+        }
+        
+        .time-total {
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .time-sessions {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+        
+        .view-time-logs-btn {
+            width: 100%;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .view-time-logs-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
 
         .status-badge {
             display: inline-flex;
@@ -1197,6 +1246,106 @@
 
         .form-field.full-width {
             grid-column: 1 / -1;
+        }
+        
+        .time-logs-summary {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            color: white;
+        }
+        
+        .summary-stat {
+            flex: 1;
+            text-align: center;
+        }
+        
+        .summary-label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            opacity: 0.9;
+            margin-bottom: 4px;
+        }
+        
+        .summary-value {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .time-logs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .time-log-entry {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px;
+        }
+        
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .log-tech {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .log-duration {
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: #667eea;
+        }
+        
+        .log-details {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .log-time {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .log-active {
+            color: #f59e0b;
+            font-weight: 600;
+        }
+        
+        .modal-close-btn {
+            width: 100%;
+            padding: 12px 24px;
+            background: var(--border-color);
+            color: var(--text-primary);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .modal-close-btn:hover {
+            background: var(--text-secondary);
+            transform: translateY(-1px);
         }
 
         .form-label {
@@ -1629,6 +1778,7 @@
         let currentStatusFilters = []; // Changed to array for multi-select
         let currentRepairFilter = 'all';
         let currentSearchFilter = ''; // Customer name search
+        let timeLogsData = []; // Store time logs from Google Sheets
         
         // Helper function to get RO from filtered view
         function getROFromFilteredView(index) {
@@ -2548,6 +2698,26 @@
                             </div>
                         </div>
                         
+                        ${(() => {
+                            const roId = `RO-${ro.customerName}-${ro.dateReceived}`;
+                            const timeStats = calculateTotalHours(roId);
+                            if (timeStats.sessionCount > 0) {
+                                return `
+                                <div class="time-logs-section">
+                                    <div class="time-logs-header">
+                                        <span class="time-icon">⏱️</span>
+                                        <span class="time-total">${formatHours(timeStats.totalSeconds)}</span>
+                                        <span class="time-sessions">(${timeStats.sessionCount} session${timeStats.sessionCount !== 1 ? 's' : ''})</span>
+                                    </div>
+                                    <button class="view-time-logs-btn" onclick="openTimeLogsModal(${index})" title="View detailed time logs">
+                                        View Time Logs
+                                    </button>
+                                </div>
+                                `;
+                            }
+                            return '';
+                        })()}
+                        
                         <button class="edit-ro-btn" onclick="openEditRO(${index})">
                             ✏️ Edit RO
                         </button>
@@ -2870,6 +3040,7 @@
             API_KEY: 'AIzaSyB6kg5hZiXJxUoGtKSXIxKj7JfOGNN6jbc',
             SPREADSHEET_ID: '1Nkf_BoqDhanJRCyeqIerF-Te_Z_R0h3mZelcgTjS62Y',
             DRIVE_FOLDER_ID: '1SdOc3FDMN20btqR4iR6rhWXiSG6gXFgv',
+            TIME_LOGS_RANGE: 'Time Logs!A:H',
             DISCOVERY_DOCS: [
                 'https://sheets.googleapis.com/$discovery/rest?version=v4',
                 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
@@ -3034,6 +3205,9 @@
                 console.log('Calling loadDataFromSheets...');
                 await loadDataFromSheets();
                 console.log('loadDataFromSheets completed');
+                console.log('Calling loadTimeLogsFromSheets...');
+                await loadTimeLogsFromSheets();
+                console.log('loadTimeLogsFromSheets completed');
             };
 
             if (accessToken === null) {
@@ -3159,6 +3333,74 @@
             }
         }
 
+        async function loadTimeLogsFromSheets() {
+            try {
+                console.log('Loading time logs from Google Sheets...');
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: GOOGLE_CONFIG.TIME_LOGS_RANGE,
+                });
+
+                const rows = response.result.values;
+                if (!rows || rows.length <= 1) {
+                    console.log('No time logs found');
+                    timeLogsData = [];
+                    return;
+                }
+
+                // Convert rows to objects (skip header)
+                const logs = [];
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    logs.push({
+                        logId: row[0],          // A: Log ID
+                        roId: row[1],           // B: RO ID
+                        techEmail: row[2],      // C: Tech Email
+                        techName: row[3],       // D: Tech Name
+                        checkIn: row[4],        // E: Check In
+                        checkOut: row[5],       // F: Check Out
+                        duration: row[6] ? parseInt(row[6]) : 0,  // G: Duration (sec)
+                        date: row[7]            // H: Date
+                    });
+                }
+
+                timeLogsData = logs;
+                console.log(`✅ Loaded ${logs.length} time log entries`);
+                
+                // Re-render board to show time data
+                renderBoard();
+                
+            } catch (err) {
+                console.error('Error loading time logs:', err);
+                timeLogsData = [];
+            }
+        }
+        
+        function getTimeLogsForRO(roId) {
+            return timeLogsData.filter(log => log.roId === roId && log.checkOut);
+        }
+        
+        function calculateTotalHours(roId) {
+            const logs = getTimeLogsForRO(roId);
+            const totalSeconds = logs.reduce((sum, log) => sum + log.duration, 0);
+            const hours = (totalSeconds / 3600).toFixed(1);
+            return {
+                hours: parseFloat(hours),
+                sessionCount: logs.length,
+                totalSeconds: totalSeconds
+            };
+        }
+        
+        function formatHours(seconds) {
+            if (seconds < 60) return `${seconds}s`;
+            if (seconds < 3600) {
+                const mins = Math.floor(seconds / 60);
+                return `${mins}m`;
+            }
+            const hours = (seconds / 3600).toFixed(1);
+            return `${hours}h`;
+        }
+
         async function updateROInSheets(roIndex, formData) {
             try {
                 const rowNumber = roIndex + 2; // +2 for header and 0-based index
@@ -3277,6 +3519,70 @@
         // Modal Controls
         let editingROIndex = null; // Track which RO is being edited
 
+        function openTimeLogsModal(index) {
+            const ro = getROFromFilteredView(index);
+            const roId = `RO-${ro.customerName}-${ro.dateReceived}`;
+            const logs = getTimeLogsForRO(roId);
+            const timeStats = calculateTotalHours(roId);
+            
+            if (logs.length === 0) {
+                alert('No time logs found for this RO');
+                return;
+            }
+            
+            const logsHtml = logs.map(log => {
+                const checkInDate = new Date(log.checkIn);
+                const checkOutDate = log.checkOut ? new Date(log.checkOut) : null;
+                const duration = formatHours(log.duration);
+                
+                return `
+                    <div class="time-log-entry">
+                        <div class="log-header">
+                            <span class="log-tech">👤 ${log.techName}</span>
+                            <span class="log-duration">${duration}</span>
+                        </div>
+                        <div class="log-details">
+                            <div class="log-time">
+                                ▶️ Check In: ${checkInDate.toLocaleString()}
+                            </div>
+                            ${checkOutDate ? `
+                            <div class="log-time">
+                                ⏹️ Check Out: ${checkOutDate.toLocaleString()}
+                            </div>
+                            ` : '<div class="log-time log-active">⚠️ Active Session</div>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            const modal = document.getElementById('modal');
+            const modalContent = document.getElementById('modalContent');
+            
+            modalContent.innerHTML = `
+                <h2>⏱️ Time Logs - ${ro.customerName}</h2>
+                <div class="time-logs-summary">
+                    <div class="summary-stat">
+                        <span class="summary-label">Total Time:</span>
+                        <span class="summary-value">${formatHours(timeStats.totalSeconds)}</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-label">Sessions:</span>
+                        <span class="summary-value">${timeStats.sessionCount}</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-label">Hours:</span>
+                        <span class="summary-value">${timeStats.hours}h</span>
+                    </div>
+                </div>
+                <div class="time-logs-list">
+                    ${logsHtml}
+                </div>
+                <button class="modal-close-btn" onclick="closeModal()">Close</button>
+            `;
+            
+            modal.style.display = 'flex';
+        }
+        
         function openEditRO(index) {
             try {
                 console.log('=== openEditRO called with index:', index);
