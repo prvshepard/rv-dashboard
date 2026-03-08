@@ -1625,7 +1625,6 @@
                     <option value="condensed">Condensed</option>
                     <option value="regular" selected>Regular</option>
                     <option value="expanded">Expanded</option>
-                    <option value="custom">Custom...</option>
                 </select>
             </div>
             
@@ -2035,6 +2034,12 @@
         
         function setViewMode(mode) {
             if (mode === 'custom') {
+                if (!isAdmin()) {
+                    alert('🔒 Custom view configuration is only available to administrators.');
+                    // Reset dropdown to current mode
+                    document.getElementById('viewModeSelector').value = currentViewMode;
+                    return;
+                }
                 openCustomViewModal();
             } else {
                 applyViewPreset(mode);
@@ -3354,6 +3359,45 @@
         let tokenClient;
         let accessToken = null;
         let currentUser = null; // Store logged-in user info
+        
+        // Admin access control
+        const ADMIN_EMAILS = ['roland@patriotsrvservices.com'];
+        
+        function isAdmin() {
+            return currentUser && ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
+        }
+        
+        function updateViewModeDropdown() {
+            const selector = document.getElementById('viewModeSelector');
+            if (!selector) return;
+            
+            // Check if Custom option already exists
+            const hasCustom = Array.from(selector.options).some(opt => opt.value === 'custom');
+            
+            if (isAdmin() && !hasCustom) {
+                // Add Custom option for admin
+                const customOption = document.createElement('option');
+                customOption.value = 'custom';
+                customOption.textContent = 'Custom... (Admin)';
+                selector.appendChild(customOption);
+            } else if (!isAdmin() && hasCustom) {
+                // Remove Custom option for non-admin
+                Array.from(selector.options).forEach(opt => {
+                    if (opt.value === 'custom') {
+                        selector.removeChild(opt);
+                    }
+                });
+                
+                // If they were in custom mode, switch to regular
+                if (currentViewMode === 'custom') {
+                    applyViewPreset('regular');
+                    selector.value = 'regular';
+                }
+            }
+            
+            // Set current value
+            selector.value = currentViewMode;
+        }
 
         // Get current user info
         async function getUserInfo() {
@@ -3380,6 +3424,10 @@
                     };
                     console.log('✓ Logged in as:', currentUser.name, '(' + currentUser.email + ')');
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    
+                    // Update view mode dropdown based on admin status
+                    updateViewModeDropdown();
+                    
                     return currentUser;
                 } else {
                     console.warn('Could not fetch user info (status:', response.status + ')');
@@ -3413,6 +3461,9 @@
                         try {
                             currentUser = JSON.parse(savedUser);
                             console.log('Loaded saved user:', currentUser.name);
+                            
+                            // Update view mode dropdown based on admin status
+                            updateViewModeDropdown();
                         } catch (e) {
                             console.error('Error parsing saved user:', e);
                         }
@@ -3837,57 +3888,65 @@
                 const duration = formatHours(log.duration);
                 
                 return `
-                    <div class="time-log-entry">
-                        <div class="log-header">
-                            <span class="log-tech">👤 ${log.techName}</span>
-                            <span class="log-duration">${duration}</span>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+                            <span style="font-weight: 600; color: #1e293b;">👤 ${log.techName}</span>
+                            <span style="font-size: 1.1rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: #667eea;">${duration}</span>
                         </div>
-                        <div class="log-details">
-                            <div class="log-time">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="font-size: 0.85rem; color: #64748b;">
                                 ▶️ Check In: ${checkInDate.toLocaleString()}
                             </div>
                             ${checkOutDate ? `
-                            <div class="log-time">
+                            <div style="font-size: 0.85rem; color: #64748b;">
                                 ⏹️ Check Out: ${checkOutDate.toLocaleString()}
                             </div>
-                            ` : '<div class="log-time log-active">⚠️ Active Session</div>'}
+                            ` : '<div style="font-size: 0.85rem; color: #f59e0b; font-weight: 600;">⚠️ Active Session</div>'}
                         </div>
                     </div>
                 `;
             }).join('');
             
-            const modal = document.getElementById('modal');
-            const modalContent = document.getElementById('modalContent');
-            
-            modalContent.innerHTML = `
-                <h2>⏱️ Time Logs - ${ro.customerName}</h2>
-                <div class="time-logs-summary">
-                    <div class="summary-stat">
-                        <span class="summary-label">Total Time:</span>
-                        <span class="summary-value">${formatHours(timeStats.totalSeconds)}</span>
-                    </div>
-                    <div class="summary-stat">
-                        <span class="summary-label">Sessions:</span>
-                        <span class="summary-value">${timeStats.sessionCount}</span>
-                    </div>
-                    <div class="summary-stat">
-                        <span class="summary-label">Hours:</span>
-                        <span class="summary-value">${timeStats.hours}h</span>
+            const modalHTML = `
+                <div id="timeLogsModalOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;" onclick="closeTimeLogsModal(event)">
+                    <div style="background: white; border-radius: 16px; padding: 40px; max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+                        <h2 style="margin-bottom: 20px; color: #1e293b; font-family: 'Barlow Condensed', sans-serif;">⏱️ Time Logs - ${ro.customerName}</h2>
+                        <div style="display: flex; gap: 20px; margin-bottom: 24px; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+                            <div style="flex: 1; text-align: center;">
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; margin-bottom: 4px;">Total Time</div>
+                                <div style="font-size: 1.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${formatHours(timeStats.totalSeconds)}</div>
+                            </div>
+                            <div style="flex: 1; text-align: center;">
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; margin-bottom: 4px;">Sessions</div>
+                                <div style="font-size: 1.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${timeStats.sessionCount}</div>
+                            </div>
+                            <div style="flex: 1; text-align: center;">
+                                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; margin-bottom: 4px;">Hours</div>
+                                <div style="font-size: 1.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${timeStats.hours}h</div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 24px;">
+                            ${logsHtml}
+                        </div>
+                        <button onclick="closeTimeLogsModal()" style="width: 100%; padding: 12px 24px; background: #64748b; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600;">Close</button>
                     </div>
                 </div>
-                <div class="time-logs-list">
-                    ${logsHtml}
-                </div>
-                <button class="modal-close-btn" onclick="closeModal()">Close</button>
             `;
             
-            modal.style.display = 'flex';
+            const modalDiv = document.createElement('div');
+            modalDiv.innerHTML = modalHTML;
+            document.body.appendChild(modalDiv);
+        }
+        
+        function closeTimeLogsModal(event) {
+            if (event) event.stopPropagation();
+            const modal = document.getElementById('timeLogsModalOverlay');
+            if (modal) {
+                modal.remove();
+            }
         }
         
         function openCustomViewModal() {
-            const modal = document.getElementById('modal');
-            const modalContent = document.getElementById('modalContent');
-            
             const elementLabels = {
                 rvPhoto: 'RV Photo',
                 customerName: 'Customer Name',
@@ -3911,38 +3970,53 @@
             };
             
             const checkboxesHtml = Object.keys(elementLabels).map(key => `
-                <label class="custom-view-checkbox">
+                <label style="display: flex; align-items: center; gap: 10px; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer;">
                     <input type="checkbox" 
                            id="toggle-${key}" 
                            ${tileVisibility[key] ? 'checked' : ''}
-                           onchange="toggleTileElement('${key}', this.checked)">
-                    <span>${elementLabels[key]}</span>
+                           onchange="toggleTileElement('${key}', this.checked)"
+                           style="width: 20px; height: 20px; cursor: pointer;">
+                    <span style="font-size: 0.95rem; color: #1e293b;">${elementLabels[key]}</span>
                 </label>
             `).join('');
             
-            modalContent.innerHTML = `
-                <h2>🎨 Customize Tile View</h2>
-                <p style="color: var(--text-secondary); margin-bottom: 24px;">
-                    Select which elements to display on RO tiles. Changes are saved automatically.
-                </p>
-                <div class="custom-view-grid">
-                    ${checkboxesHtml}
+            const modalHTML = `
+                <div id="customViewModalOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;" onclick="closeCustomViewModal(event)">
+                    <div style="background: white; border-radius: 16px; padding: 40px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+                        <h2 style="margin-bottom: 12px; color: #1e293b; font-family: 'Barlow Condensed', sans-serif;">🎨 Customize Tile View</h2>
+                        <p style="color: #64748b; margin-bottom: 24px;">
+                            Select which elements to display on RO tiles. Changes are saved automatically.
+                        </p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-bottom: 24px; max-height: 400px; overflow-y: auto; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                            ${checkboxesHtml}
+                        </div>
+                        <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                            <button onclick="applyViewPreset('condensed'); updateCustomViewChecks();" style="flex: 1; padding: 10px 16px; background: #f8fafc; color: #1e293b; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
+                                Condensed Preset
+                            </button>
+                            <button onclick="applyViewPreset('regular'); updateCustomViewChecks();" style="flex: 1; padding: 10px 16px; background: #f8fafc; color: #1e293b; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
+                                Regular Preset
+                            </button>
+                            <button onclick="applyViewPreset('expanded'); updateCustomViewChecks();" style="flex: 1; padding: 10px 16px; background: #f8fafc; color: #1e293b; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
+                                Expanded Preset
+                            </button>
+                        </div>
+                        <button onclick="closeCustomViewModal()" style="width: 100%; padding: 12px 24px; background: #64748b; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600;">Done</button>
+                    </div>
                 </div>
-                <div class="custom-view-actions">
-                    <button class="custom-view-btn preset-btn" onclick="applyViewPreset('condensed'); updateCustomViewChecks(); ">
-                        Condensed Preset
-                    </button>
-                    <button class="custom-view-btn preset-btn" onclick="applyViewPreset('regular'); updateCustomViewChecks();">
-                        Regular Preset
-                    </button>
-                    <button class="custom-view-btn preset-btn" onclick="applyViewPreset('expanded'); updateCustomViewChecks();">
-                        Expanded Preset
-                    </button>
-                </div>
-                <button class="modal-close-btn" onclick="closeModal()">Done</button>
             `;
             
-            modal.style.display = 'flex';
+            const modalDiv = document.createElement('div');
+            modalDiv.innerHTML = modalHTML;
+            document.body.appendChild(modalDiv);
+        }
+        
+        function closeCustomViewModal(event) {
+            if (event) event.stopPropagation();
+            const modal = document.getElementById('customViewModalOverlay');
+            if (modal) {
+                modal.remove();
+            }
         }
         
         function toggleTileElement(element, visible) {
