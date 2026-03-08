@@ -2551,8 +2551,8 @@
             
             try {
                 // Create QR code using qrcode-generator library
-                // Use higher type number for better scannability with logo
-                const qr = qrcode(10, 'H'); // Type 10 (larger), Error correction level H (30% recovery)
+                // Use error correction level M (medium) - good balance without logo
+                const qr = qrcode(0, 'M'); // Type 0 (auto), Error correction level M
                 qr.addData(checkInURL);
                 qr.make();
                 
@@ -2568,7 +2568,7 @@
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Draw QR code modules (larger cells for better scanning)
+                // Draw QR code modules
                 ctx.fillStyle = '#000000';
                 for (let row = 0; row < moduleCount; row++) {
                     for (let col = 0; col < moduleCount; col++) {
@@ -2583,37 +2583,10 @@
                     }
                 }
                 
-                // Add smaller logo in center (15% instead of 25% - much smaller)
-                const logoSize = Math.floor(canvas.width * 0.15); // Reduced to 15% of QR size
-                const logoX = (canvas.width - logoSize) / 2;
-                const logoY = (canvas.height - logoSize) / 2;
+                // No logo - mark canvas as ready immediately
+                canvas.dataset.ready = 'true';
                 
-                // White background for logo area with padding
-                ctx.fillStyle = '#ffffff';
-                const padding = 3;
-                ctx.fillRect(logoX - padding, logoY - padding, logoSize + (padding * 2), logoSize + (padding * 2));
-                
-                // Load and draw logo
-                const logo = new Image();
-                logo.onload = function() {
-                    // Draw logo on top of QR code
-                    ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
-                    console.log('✓ Logo loaded and drawn successfully');
-                    
-                    // Mark canvas as ready
-                    canvas.dataset.ready = 'true';
-                };
-                logo.onerror = function(err) {
-                    console.warn('Logo failed to load, QR code without logo');
-                    // Don't draw fallback text - just leave white space for better scanning
-                    
-                    // Mark canvas as ready even without logo
-                    canvas.dataset.ready = 'true';
-                };
-                // Load from GitHub (same domain, no CORS issues)
-                logo.src = 'https://prvshepard.github.io/rv-dashboard/logo.png';
-                
-                console.log('✓ QR code generated successfully');
+                console.log('✓ QR code generated successfully (no logo)');
             } catch (error) {
                 console.error('Error generating QR code:', error);
                 // Fallback to placeholder
