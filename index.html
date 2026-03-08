@@ -2885,60 +2885,85 @@
         let editingROIndex = null; // Track which RO is being edited
 
         function openEditRO(index) {
-            // Get the sorted data to find the correct RO
-            const sorted = [...currentData].map(ro => ({
-                ...ro,
-                priorityScore: calculatePriority(ro)
-            })).sort((a, b) => b.priorityScore - a.priorityScore);
-            
-            const ro = sorted[index];
-            if (!ro) {
-                alert('Error: Could not find the repair order.');
-                return;
+            try {
+                console.log('=== openEditRO called with index:', index);
+                
+                // Get the sorted data to find the correct RO
+                const sorted = [...currentData].map(ro => ({
+                    ...ro,
+                    priorityScore: calculatePriority(ro)
+                })).sort((a, b) => b.priorityScore - a.priorityScore);
+                
+                console.log('Sorted data length:', sorted.length);
+                
+                const ro = sorted[index];
+                if (!ro) {
+                    console.error('Could not find RO at index:', index);
+                    alert('Error: Could not find the repair order.');
+                    return;
+                }
+
+                console.log('Found RO:', ro.customerName);
+
+                // Store which RO we're editing
+                editingROIndex = currentData.findIndex(item => 
+                    item.customerName === ro.customerName && 
+                    item.dateReceived === ro.dateReceived
+                );
+
+                console.log('Editing RO at original index:', editingROIndex);
+
+                // Get form elements
+                const form = document.getElementById('newROForm');
+                const modalTitle = document.querySelector('#modalOverlay h2');
+                const submitBtn = document.querySelector('#newROForm button[type=\"submit\"]');
+
+                if (!form || !modalTitle || !submitBtn) {
+                    console.error('Missing form elements:', { form, modalTitle, submitBtn });
+                    alert('Error: Form elements not found');
+                    return;
+                }
+
+                // Change modal title and button text
+                modalTitle.textContent = 'Edit Repair Order';
+                submitBtn.textContent = 'Update RO';
+
+                // Populate form fields (only those that exist in the form)
+                if (form.elements['customerName']) form.elements['customerName'].value = ro.customerName || '';
+                if (form.elements['customerPhone']) form.elements['customerPhone'].value = ro.customerPhone || '';
+                if (form.elements['customerEmail']) form.elements['customerEmail'].value = ro.customerEmail || '';
+                if (form.elements['customerAddress']) form.elements['customerAddress'].value = ro.customerAddress || '';
+                if (form.elements['rv']) form.elements['rv'].value = ro.rv || '';
+                if (form.elements['rvPhotoUrl']) form.elements['rvPhotoUrl'].value = ro.rvPhotoUrl || '';
+                if (form.elements['repairDescription']) form.elements['repairDescription'].value = ro.repairDescription || '';
+                if (form.elements['technicianAssigned']) form.elements['technicianAssigned'].value = ro.technicianAssigned || '';
+                if (form.elements['dollarValue']) form.elements['dollarValue'].value = ro.dollarValue || '';
+                if (form.elements['status']) form.elements['status'].value = ro.status || '';
+                if (form.elements['urgency']) form.elements['urgency'].value = ro.urgency || '';
+                if (form.elements['customerType']) form.elements['customerType'].value = ro.customerType || '';
+
+                // Handle repair type checkboxes
+                const repairTypes = (ro.repairType || '').split(',').map(t => t.trim());
+                const checkboxes = form.querySelectorAll('input[name="repairType"]');
+                checkboxes.forEach(cb => {
+                    cb.checked = repairTypes.includes(cb.value);
+                });
+
+                console.log('Form populated, opening modal...');
+
+                // Open modal
+                const modalOverlay = document.getElementById('modalOverlay');
+                if (modalOverlay) {
+                    modalOverlay.classList.add('active');
+                    console.log('✓ Modal opened successfully');
+                } else {
+                    console.error('Modal overlay not found!');
+                    alert('Error: Could not open edit form');
+                }
+            } catch (error) {
+                console.error('Error in openEditRO:', error);
+                alert('Error opening edit form: ' + error.message);
             }
-
-            // Store which RO we're editing
-            editingROIndex = currentData.findIndex(item => 
-                item.customerName === ro.customerName && 
-                item.dateReceived === ro.dateReceived
-            );
-
-            // Get form elements
-            const form = document.getElementById('newROForm');
-            const modalTitle = document.querySelector('#modalOverlay h2');
-            const submitBtn = document.querySelector('#newROForm button[type="submit"]');
-
-            // Change modal title and button text
-            modalTitle.textContent = 'Edit Repair Order';
-            submitBtn.textContent = 'Update RO';
-
-            // Populate form fields
-            form.elements['customerName'].value = ro.customerName || '';
-            form.elements['customerPhone'].value = ro.customerPhone || '';
-            form.elements['customerEmail'].value = ro.customerEmail || '';
-            form.elements['customerAddress'].value = ro.customerAddress || '';
-            form.elements['rv'].value = ro.rv || '';
-            form.elements['repairDescription'].value = ro.repairDescription || '';
-            form.elements['technicianAssigned'].value = ro.technicianAssigned || '';
-            form.elements['dateReceived'].value = ro.dateReceived || '';
-            form.elements['percentComplete'].value = ro.percentComplete || 0;
-            form.elements['dollarValue'].value = ro.dollarValue || '';
-            form.elements['status'].value = ro.status || '';
-            form.elements['urgency'].value = ro.urgency || '';
-            form.elements['customerType'].value = ro.customerType || '';
-            form.elements['promisedDate'].value = ro.promisedDate || '';
-            form.elements['roStatusNotes'].value = ro.roStatusNotes || '';
-            form.elements['customerCommunicationNotes'].value = ro.customerCommunicationNotes || '';
-
-            // Handle repair type checkboxes
-            const repairTypes = (ro.repairType || '').split(',').map(t => t.trim());
-            const checkboxes = form.querySelectorAll('input[name="repairType"]');
-            checkboxes.forEach(cb => {
-                cb.checked = repairTypes.includes(cb.value);
-            });
-
-            // Open modal
-            document.getElementById('modalOverlay').classList.add('active');
         }
 
         function setupModalListeners() {
