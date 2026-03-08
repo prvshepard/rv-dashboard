@@ -509,6 +509,13 @@
             const duration = calculateDuration(currentSession.checkIn, currentSession.checkOut);
             currentSession.duration = duration;
             
+            // Stop timer and remove visibility listener
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            
             saveLocalSession();
             syncToSheets();
             
@@ -523,7 +530,7 @@
         function startTimer() {
             if (timerInterval) clearInterval(timerInterval);
             
-            timerInterval = setInterval(() => {
+            const updateTimer = () => {
                 const now = new Date();
                 const start = new Date(currentSession.checkIn);
                 const elapsed = Math.floor((now - start) / 1000);
@@ -533,8 +540,69 @@
                 const seconds = elapsed % 60;
                 
                 const display = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-                document.getElementById('timerDisplay').textContent = display;
-            }, 1000);
+                const timerEl = document.getElementById('timerDisplay');
+                if (timerEl) {
+                    timerEl.textContent = display;
+                }
+            };
+            
+            // Update immediately
+            updateTimer();
+            
+            // Only run timer when page is visible
+            if (!document.hidden) {
+                timerInterval = setInterval(updateTimer, 1000);
+            }
+            
+            // Listen for visibility changes
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+        
+        function handleVisibilityChange() {
+            if (document.hidden) {
+                // Page is hidden (phone locked, switched apps, etc.)
+                console.log('⏸️ Timer paused - page hidden');
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+            } else {
+                // Page is visible again
+                console.log('▶️ Timer resumed - page visible');
+                if (currentSession && !currentSession.checkOut) {
+                    // Recalculate from timestamp and restart timer
+                    const now = new Date();
+                    const start = new Date(currentSession.checkIn);
+                    const elapsed = Math.floor((now - start) / 1000);
+                    
+                    const hours = Math.floor(elapsed / 3600);
+                    const minutes = Math.floor((elapsed % 3600) / 60);
+                    const seconds = elapsed % 60;
+                    
+                    const display = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+                    const timerEl = document.getElementById('timerDisplay');
+                    if (timerEl) {
+                        timerEl.textContent = display;
+                    }
+                    
+                    // Restart interval
+                    timerInterval = setInterval(() => {
+                        const now = new Date();
+                        const start = new Date(currentSession.checkIn);
+                        const elapsed = Math.floor((now - start) / 1000);
+                        
+                        const hours = Math.floor(elapsed / 3600);
+                        const minutes = Math.floor((elapsed % 3600) / 60);
+                        const seconds = elapsed % 60;
+                        
+                        const display = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+                        const timerEl = document.getElementById('timerDisplay');
+                        if (timerEl) {
+                            timerEl.textContent = display;
+                        }
+                    }, 1000);
+                }
+            }
         }
 
         function pad(num) {
