@@ -3543,6 +3543,10 @@
                     console.log('✅ Token still valid, loading...');
                     accessToken = savedToken;
                     
+                    // CRITICAL: Set token in gapi so API calls work
+                    gapi.client.setToken({access_token: savedToken});
+                    console.log('✅ Token set in gapi client');
+                    
                     // Load saved user info
                     if (savedUser) {
                         try {
