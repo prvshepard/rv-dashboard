@@ -2949,12 +2949,12 @@
                                     data-original-status="${ro.status}">
                                 <option value="Not On Lot" ${ro.status === 'Not On Lot' ? 'selected' : ''}>Not On Lot</option>
                                 <option value="On Lot" ${ro.status === 'On Lot' ? 'selected' : ''}>On Lot</option>
-                                <option value="In progress" ${ro.status === 'In progress' ? 'selected' : ''}>In Progress</option>
+                                <option value="Awaiting Approval" ${ro.status === 'Awaiting Approval' ? 'selected' : ''}>Awaiting Approval</option>
                                 <option value="Awaiting parts" ${ro.status === 'Awaiting parts' ? 'selected' : ''}>Awaiting Parts</option>
+                                <option value="In progress" ${ro.status === 'In progress' ? 'selected' : ''}>In Progress</option>
+                                <option value="Completed" ${ro.status === 'Completed' ? 'selected' : ''}>Completed</option>
                                 <option value="Quality check" ${ro.status === 'Quality check' ? 'selected' : ''}>Quality Check</option>
                                 <option value="Ready for pickup" ${ro.status === 'Ready for pickup' ? 'selected' : ''}>Ready for Pickup</option>
-                                <option value="Awaiting Approval" ${ro.status === 'Awaiting Approval' ? 'selected' : ''}>Awaiting Approval</option>
-                                <option value="Completed" ${ro.status === 'Completed' ? 'selected' : ''}>Completed</option>
                                 <option value="Delivered/Cashed Out" ${ro.status === 'Delivered/Cashed Out' ? 'selected' : ''}>Delivered/Cashed Out</option>
                             </select>
                         </div>
@@ -4652,12 +4652,12 @@
                             <option value="">Select Status</option>
                             <option value="Not On Lot">Not On Lot</option>
                             <option value="On Lot">On Lot</option>
-                            <option value="In progress">In progress</option>
+                            <option value="Awaiting Approval">Awaiting Approval</option>
                             <option value="Awaiting parts">Awaiting parts</option>
+                            <option value="In progress">In progress</option>
+                            <option value="Completed">Completed</option>
                             <option value="Quality check">Quality check</option>
                             <option value="Ready for pickup">Ready for pickup</option>
-                            <option value="Awaiting Approval">Awaiting Approval</option>
-                            <option value="Completed">Completed</option>
                             <option value="Delivered/Cashed Out">Delivered/Cashed Out</option>
                         </select>
                     </div>
