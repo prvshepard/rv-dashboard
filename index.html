@@ -2213,8 +2213,8 @@
             // Decode HTML entities and newlines
             const decodedValue = currentValue.replace(/&quot;/g, '"').replace(/\\n/g, '\n');
             
-            // Prompt for new update
-            const newUpdate = prompt(`Add update to ${field.name}:`, '');
+            // Show voice-enabled modal instead of prompt
+            const newUpdate = await showVoiceNotesModal(`Add update to ${field.name}:`);
             
             if (newUpdate === null || newUpdate.trim() === '') {
                 return; // User cancelled or entered nothing
@@ -3845,6 +3845,109 @@
                     btn.textContent = originalText;
                     btn.disabled = false;
                 }, 2000);
+            }
+        }
+        
+        // Voice-enabled notes modal
+        function showVoiceNotesModal(title) {
+            return new Promise((resolve) => {
+                const modalHTML = `
+                    <div id="voiceNotesModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;">
+                        <div style="background: white; border-radius: 16px; padding: 30px; max-width: 600px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                            <h3 style="margin: 0 0 20px 0; color: #1e293b; font-size: 1.3rem;">${title}</h3>
+                            <div style="position: relative;">
+                                <textarea id="voiceNotesInput" placeholder="Type or use voice..." style="width: 100%; min-height: 150px; padding: 15px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem; font-family: inherit; resize: vertical; margin-bottom: 10px;"></textarea>
+                                <button onclick="startVoiceDictationForModal()" style="position: absolute; top: 10px; right: 10px; padding: 10px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 8px rgba(16,185,129,0.3);">
+                                    🎤 Dictate
+                                </button>
+                            </div>
+                            <div id="voiceNotesStatus" style="margin-bottom: 15px; font-size: 0.9rem; color: #64748b; min-height: 20px;"></div>
+                            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                                <button onclick="closeVoiceNotesModal(null)" style="padding: 12px 24px; background: #64748b; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600;">
+                                    Cancel
+                                </button>
+                                <button onclick="closeVoiceNotesModal(document.getElementById('voiceNotesInput').value)" style="padding: 12px 24px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600;">
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+                document.getElementById('voiceNotesInput').focus();
+                
+                // Store resolve function globally
+                window.voiceNotesResolve = resolve;
+            });
+        }
+        
+        function closeVoiceNotesModal(value) {
+            const modal = document.getElementById('voiceNotesModal');
+            if (modal) modal.remove();
+            if (window.voiceNotesResolve) {
+                window.voiceNotesResolve(value);
+                window.voiceNotesResolve = null;
+            }
+        }
+        
+        function startVoiceDictationForModal() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Voice dictation is not supported in this browser. Please use Chrome or Safari.');
+                return;
+            }
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+            
+            const statusEl = document.getElementById('voiceNotesStatus');
+            const inputEl = document.getElementById('voiceNotesInput');
+            
+            recognition.onstart = () => {
+                if (statusEl) {
+                    statusEl.textContent = '🎤 Listening... Speak now.';
+                    statusEl.style.color = '#10b981';
+                }
+            };
+            
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                if (inputEl) {
+                    const currentText = inputEl.value;
+                    inputEl.value = currentText ? `${currentText} ${transcript}` : transcript;
+                }
+                if (statusEl) {
+                    statusEl.textContent = '✅ Transcribed!';
+                    statusEl.style.color = '#10b981';
+                    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+                }
+            };
+            
+            recognition.onerror = (event) => {
+                if (statusEl) {
+                    statusEl.textContent = `❌ Error: ${event.error}`;
+                    statusEl.style.color = '#dc2626';
+                    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+                }
+            };
+            
+            recognition.onend = () => {
+                if (statusEl && statusEl.textContent.includes('Listening')) {
+                    statusEl.textContent = '';
+                }
+            };
+            
+            try {
+                recognition.start();
+            } catch (error) {
+                if (statusEl) {
+                    statusEl.textContent = '❌ Could not start voice recognition';
+                    statusEl.style.color = '#dc2626';
+                }
             }
         }
         
