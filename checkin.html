@@ -960,14 +960,17 @@
             console.log('roId:', roId);
             console.log('customerName:', customerName);
             
-            // Extract customer name from RO ID (format: RO-Customer-Name-Date)
+            // Extract customer name from RO ID (format: RO-Customer-Name-YYYY-MM-DD)
             let extractedCustomer = 'Unknown Customer';
             if (roId && roId.startsWith('RO-')) {
-                const parts = roId.split('-');
-                console.log('RO ID parts:', parts);
-                if (parts.length >= 2) {
-                    // Reconstruct customer name from parts (everything except RO and last part which is date)
-                    extractedCustomer = parts.slice(1, -1).join(' ');
+                // Remove 'RO-' prefix
+                const withoutPrefix = roId.substring(3);
+                
+                // Find the last date pattern (YYYY-MM-DD at the end)
+                const dateMatch = withoutPrefix.match(/^(.+)-(\d{4}-\d{2}-\d{2})$/);
+                if (dateMatch) {
+                    // Replace hyphens in name with spaces
+                    extractedCustomer = dateMatch[1].replace(/-/g, ' ');
                 }
             }
             
@@ -976,7 +979,7 @@
             // Set RO data from URL
             roData = {
                 id: roId,
-                customer: customerName || extractedCustomer,
+                customer: extractedCustomer,
                 status: 'In Progress',
                 repairType: 'Various'
             };
@@ -1066,6 +1069,22 @@
             console.log('renderInterface called');
             console.log('roData:', roData);
             console.log('currentUser:', currentUser);
+            
+            // Show loading if no RO data yet
+            if (!roData || !roData.customer) {
+                document.getElementById('app').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div class="loading-spinner" style="margin: 0 auto 20px; width: 40px; height: 40px; border: 4px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <p style="color: #64748b;">Loading RO details...</p>
+                    </div>
+                    <style>
+                        @keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                    </style>
+                `;
+                return;
+            }
             
             const isCheckedIn = currentSession && !currentSession.checkOut;
             
