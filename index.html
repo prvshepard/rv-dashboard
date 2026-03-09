@@ -3514,20 +3514,28 @@
 
         // Load saved token on page load
         function loadSavedToken() {
+            console.log('🔍 loadSavedToken called');
             const savedToken = localStorage.getItem('google_access_token');
             const tokenExpiry = localStorage.getItem('google_token_expiry');
             const savedUser = localStorage.getItem('currentUser');
             const lastAuthTime = localStorage.getItem('last_auth_time');
             
+            console.log('Saved token exists:', !!savedToken);
+            console.log('Token expiry:', tokenExpiry);
+            
             // Detect Safari
             const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            console.log('Is Safari:', isSafari);
             
             if (savedToken && tokenExpiry) {
                 const now = Date.now();
                 const expiryTime = parseInt(tokenExpiry);
                 
+                console.log('Time until expiry (minutes):', Math.round((expiryTime - now) / 60000));
+                
                 // Check if token is still valid (with 5 minute buffer)
                 if (now < (expiryTime - 300000)) {
+                    console.log('✅ Token still valid, loading...');
                     accessToken = savedToken;
                     
                     // Load saved user info
@@ -3543,7 +3551,9 @@
                         }
                     }
                     
+                    console.log('Calling updateAuthStatus(true)...');
                     updateAuthStatus(true);
+                    console.log('Calling loadDataFromSheets()...');
                     loadDataFromSheets();
                     console.log('Loaded saved token, expires in:', Math.round((expiryTime - now) / 60000), 'minutes');
                     
@@ -3554,6 +3564,7 @@
                     
                     return true;
                 } else if (lastAuthTime && !isSafari) {
+                    console.log('Token expired, attempting silent refresh (Chrome only)...');
                     // Token expired but user had recent session - try silent refresh
                     // SKIP on Safari - silent refresh not supported
                     const lastAuth = parseInt(lastAuthTime);
@@ -3568,16 +3579,23 @@
                             } catch (e) {}
                         }
                         // Try silent token refresh
-                        tokenClient.requestAccessToken({prompt: ''});
+                        try {
+                            tokenClient.requestAccessToken({prompt: ''});
+                        } catch (e) {
+                            console.log('Silent refresh not supported, clearing token');
+                            clearToken();
+                        }
                         return true;
                     } else {
                         console.log('Session too old, clearing...');
                         clearToken();
                     }
                 } else {
-                    console.log('Saved token expired, clearing...');
+                    console.log('❌ Saved token expired, clearing...');
                     clearToken();
                 }
+            } else {
+                console.log('❌ No saved token found');
             }
             return false;
         }
@@ -3618,7 +3636,11 @@
                 setTimeout(() => {
                     console.log('Auto-refreshing token...');
                     // Request new token silently
-                    tokenClient.requestAccessToken({prompt: ''});
+                    try {
+                        tokenClient.requestAccessToken({prompt: ''});
+                    } catch (e) {
+                        console.log('Auto-refresh not supported on this browser');
+                    }
                 }, refreshTime);
             }
         }
@@ -3700,7 +3722,12 @@
                 tokenClient.requestAccessToken({prompt: 'consent'});
             } else {
                 console.log('Refreshing existing token...');
-                tokenClient.requestAccessToken({prompt: ''});
+                try {
+                    tokenClient.requestAccessToken({prompt: ''});
+                } catch (e) {
+                    console.log('Silent refresh not supported, requesting with consent');
+                    tokenClient.requestAccessToken({prompt: 'consent'});
+                }
             }
         }
 
