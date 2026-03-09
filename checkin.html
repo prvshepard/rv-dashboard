@@ -1122,6 +1122,17 @@
                         <h3>Time on Job</h3>
                         <div class="timer-display" id="timerDisplay">00:00:00</div>
                     </div>
+                    
+                    <div class="notes-section" style="margin: 20px 0; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-weight: 600; color: #1e293b;">
+                            📝 Work Notes
+                            <button onclick="startVoiceDictation()" style="margin-left: auto; padding: 8px 16px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                                🎤 Dictate
+                            </button>
+                        </label>
+                        <textarea id="workNotes" placeholder="Add notes about work performed..." style="width: 100%; min-height: 100px; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical;"></textarea>
+                        <div id="voiceStatus" style="margin-top: 8px; font-size: 12px; color: #64748b;"></div>
+                    </div>
                 `;
             }
 
@@ -1428,6 +1439,66 @@
 
         function pad(num) {
             return num.toString().padStart(2, '0');
+        }
+        
+        // Voice dictation function for work notes
+        function startVoiceDictation() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Voice dictation is not supported in this browser. Please use Chrome or Safari.');
+                return;
+            }
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+            
+            const statusEl = document.getElementById('voiceStatus');
+            const notesEl = document.getElementById('workNotes');
+            
+            recognition.onstart = () => {
+                if (statusEl) statusEl.textContent = '🎤 Listening... Speak now.';
+                if (statusEl) statusEl.style.color = '#10b981';
+            };
+            
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                if (notesEl) {
+                    // Append to existing notes with a space
+                    const currentText = notesEl.value;
+                    notesEl.value = currentText ? `${currentText} ${transcript}` : transcript;
+                }
+                if (statusEl) {
+                    statusEl.textContent = '✅ Transcribed!';
+                    statusEl.style.color = '#10b981';
+                    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+                }
+            };
+            
+            recognition.onerror = (event) => {
+                if (statusEl) {
+                    statusEl.textContent = `❌ Error: ${event.error}`;
+                    statusEl.style.color = '#dc2626';
+                    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+                }
+            };
+            
+            recognition.onend = () => {
+                if (statusEl && statusEl.textContent.includes('Listening')) {
+                    statusEl.textContent = '';
+                }
+            };
+            
+            try {
+                recognition.start();
+            } catch (error) {
+                if (statusEl) {
+                    statusEl.textContent = '❌ Could not start voice recognition';
+                    statusEl.style.color = '#dc2626';
+                }
+            }
         }
 
         function calculateDuration(start, end) {
