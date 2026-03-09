@@ -2636,12 +2636,17 @@
             updateClock();
             setInterval(updateClock, 1000);
             
-            // Check for saved authentication token
-            setTimeout(() => {
+            // Check for saved authentication token - retry until libraries load
+            const checkAuth = () => {
                 if (gapiInited && gisInited) {
+                    console.log('📡 Libraries loaded, checking for saved token...');
                     loadSavedToken();
+                } else {
+                    console.log('⏳ Waiting for Google libraries...');
+                    setTimeout(checkAuth, 200);
                 }
-            }, 1000);
+            };
+            setTimeout(checkAuth, 500);
         }
 
         function updateClock() {
