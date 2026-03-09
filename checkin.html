@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!-- 
+    PRVS Tech Check-In v1.0
+    Released: 2026-03-09
+    Features: QR code check-in/out, work notes with voice dictation
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -207,6 +212,10 @@
         <div id="app" class="loading">
             Loading RO details...
         </div>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <span style="font-size: 0.7rem; color: rgba(255,255,255,0.5); font-family: monospace;">v1.0</span>
+        </div>
     </div>
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -247,6 +256,7 @@
         document.addEventListener('DOMContentLoaded', init);
 
         function init() {
+            console.log('📦 PRVS Tech Check-In v1.0 - Released 2026-03-09');
             console.log('Check-in page loaded for RO:', roId);
             
             if (!roId) {
