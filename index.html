@@ -2476,30 +2476,39 @@
                     item.dateReceived === ro.dateReceived
                 );
 
+                // Auto-set dateArrived if transitioning off "Not On Lot" and no date set yet
+                const today = new Date().toISOString().split('T')[0];
+                let autoDateArrived = null;
                 if (originalIndex !== -1) {
+                    const wasNotOnLot = currentData[originalIndex].status === 'Not On Lot';
+                    const hasArrivalDate = !!currentData[originalIndex].dateArrived;
+                    if (wasNotOnLot && newStatus !== 'Not On Lot' && !hasArrivalDate) {
+                        autoDateArrived = today;
+                        currentData[originalIndex].dateArrived = today;
+                        console.log('Auto-setting dateArrived to today:', today);
+                    }
                     currentData[originalIndex].status = newStatus;
                     currentData[originalIndex].percentComplete = autoProgress;
                     console.log('Updated currentData at index:', originalIndex, 'by', userName);
                 }
 
-                // Update Google Sheets - Status is column M (13th), Progress is column K (11th)
+                // Update Google Sheets - Status is column M (13th), Progress is column K (11th), DateArrived is column S (19th)
                 const rowNumber = originalIndex + 2; // +2 for header and 0-based index
                 
+                const batchData = [
+                    { range: `Sheet1!K${rowNumber}`, values: [[autoProgress]] },
+                    { range: `Sheet1!M${rowNumber}`, values: [[newStatus]] }
+                ];
+                if (autoDateArrived) {
+                    batchData.push({ range: `Sheet1!S${rowNumber}`, values: [[autoDateArrived]] });
+                }
+
                 // Update both status and progress in one batch
                 await gapi.client.sheets.spreadsheets.values.batchUpdate({
                     spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
                     resource: {
                         valueInputOption: 'RAW',
-                        data: [
-                            {
-                                range: `Sheet1!K${rowNumber}`,
-                                values: [[autoProgress]]
-                            },
-                            {
-                                range: `Sheet1!M${rowNumber}`,
-                                values: [[newStatus]]
-                            }
-                        ]
+                        data: batchData
                     }
                 });
 
@@ -2881,13 +2890,25 @@
             }).replace(/\s+/g, '');
         }
 
-        function calculateDaysOnLot(dateReceived) {
-            if (!dateReceived) return 0;
-            const received = new Date(dateReceived);
+        // calculateDaysOnLot: pass full RO object for smart logic, or a date string for legacy use
+        function calculateDaysOnLot(roOrDate) {
+            if (!roOrDate) return 0;
+            // If passed a full RO object
+            if (typeof roOrDate === 'object') {
+                const ro = roOrDate;
+                // RV is Not On Lot with no arrival date — don't count days
+                if (ro.status === 'Not On Lot' && !ro.dateArrived) return null;
+                // Use dateArrived if set, otherwise fall back to dateReceived
+                const startDate = ro.dateArrived || ro.dateReceived;
+                if (!startDate) return 0;
+                const start = new Date(startDate);
+                const today = new Date();
+                return Math.floor(Math.abs(today - start) / (1000 * 60 * 60 * 24));
+            }
+            // Legacy: raw date string
+            const received = new Date(roOrDate);
             const today = new Date();
-            const diffTime = Math.abs(today - received);
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            return diffDays;
+            return Math.floor(Math.abs(today - received) / (1000 * 60 * 60 * 24));
         }
 
         function shouldShow(element) {
@@ -2898,7 +2919,7 @@
             let score = 0;
             
             // Days waiting (primary factor) - 10 points per day
-            const daysOnLot = calculateDaysOnLot(ro.dateReceived);
+            const daysOnLot = calculateDaysOnLot(ro) || 0;
             score += daysOnLot * 10;
             
             // Urgency (secondary factor)
@@ -3019,8 +3040,8 @@
                         ${shouldShow('daysOnLot') || shouldShow('dollarValue') ? `
                         <div class="card-header-row">
                             ${shouldShow('daysOnLot') ? `
-                            <div class="days-on-lot" style="color: ${getDaysHeatColor(calculateDaysOnLot(ro.dateReceived))};">
-                                ${calculateDaysOnLot(ro.dateReceived)} <span class="days-label">Days</span>
+                            <div class="days-on-lot" style="color: ${getDaysHeatColor(calculateDaysOnLot(ro))};">
+                                ${calculateDaysOnLot(ro) !== null ? calculateDaysOnLot(ro) + ' <span class=\"days-label\">Days</span>' : '<span class=\"days-label\">Not On Lot</span>'}
                             </div>
                             ` : ''}
                             ${shouldShow('dollarValue') && ro.dollarValue !== undefined && ro.dollarValue !== null ? `
@@ -3513,13 +3534,15 @@
             const filtered = filteredData ? filteredData.length : total;
             const inProgress = data.filter(ro => ro.status === 'In progress').length;
             const awaitingParts = data.filter(ro => ro.status === 'Awaiting parts').length;
-            const avgDays = total > 0 
-                ? Math.round(data.reduce((sum, ro) => sum + calculateDaysOnLot(ro.dateReceived), 0) / total)
+            // Exclude "Not On Lot" RVs (with no arrival date) from days-on-lot stats
+            const onLotROs = data.filter(ro => !(ro.status === 'Not On Lot' && !ro.dateArrived));
+            const avgDays = onLotROs.length > 0
+                ? Math.round(onLotROs.reduce((sum, ro) => sum + (calculateDaysOnLot(ro) || 0), 0) / onLotROs.length)
                 : 0;
             
-            // Calculate longest wait (max days on lot)
-            const longestWait = total > 0
-                ? Math.max(...data.map(ro => calculateDaysOnLot(ro.dateReceived)))
+            // Calculate longest wait (max days on lot, excluding Not On Lot)
+            const longestWait = onLotROs.length > 0
+                ? Math.max(...onLotROs.map(ro => calculateDaysOnLot(ro) || 0))
                 : 0;
             
             const totalValue = data.reduce((sum, ro) => sum + (ro.dollarValue || 0), 0);
@@ -4039,7 +4062,7 @@
                 console.log('Fetching data from spreadsheet:', GOOGLE_CONFIG.SPREADSHEET_ID);
                 const response = await gapi.client.sheets.spreadsheets.values.get({
                     spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
-                    range: 'Sheet1!A1:R1000',  // Explicitly specify all columns A through R
+                    range: 'Sheet1!A1:S1000',  // Explicitly specify all columns A through S
                 });
 
                 console.log('Response received:', response);
@@ -4403,10 +4426,11 @@
                     formData.customerType,
                     formData.promisedDate || '',
                     formData.roStatusNotes || '',
-                    formData.customerCommunicationNotes || ''
+                    formData.customerCommunicationNotes || '',
+                    formData.dateArrived || currentData[roIndex].dateArrived || ''
                 ]];
 
-                const range = `Sheet1!A${rowNumber}:R${rowNumber}`;
+                const range = `Sheet1!A${rowNumber}:S${rowNumber}`;
                 
                 const response = await gapi.client.sheets.spreadsheets.values.update({
                     spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
@@ -4437,7 +4461,8 @@
                     customerType: formData.customerType,
                     promisedDate: formData.promisedDate || '',
                     roStatusNotes: formData.roStatusNotes || '',
-                    customerCommunicationNotes: formData.customerCommunicationNotes || ''
+                    customerCommunicationNotes: formData.customerCommunicationNotes || '',
+                    dateArrived: formData.dateArrived || currentData[roIndex].dateArrived || ''
                 };
                 
                 console.log('✓ RO updated by', userName);
@@ -4474,12 +4499,13 @@
                     formData.customerType,
                     formData.promisedDate || '',
                     formData.roStatusNotes || '',
-                    formData.customerCommunicationNotes || ''
+                    formData.customerCommunicationNotes || '',
+                    formData.dateArrived || ''
                 ]];
 
                 const response = await gapi.client.sheets.spreadsheets.values.append({
                     spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
-                    range: 'Sheet1!A:R',
+                    range: 'Sheet1!A:S',
                     valueInputOption: 'RAW',
                     resource: { values }
                 });
@@ -4920,6 +4946,8 @@
                 if (form.elements['status']) form.elements['status'].value = ro.status || '';
                 if (form.elements['urgency']) form.elements['urgency'].value = ro.urgency || '';
                 if (form.elements['customerType']) form.elements['customerType'].value = ro.customerType || '';
+                if (form.elements['promisedDate']) form.elements['promisedDate'].value = ro.promisedDate || '';
+                if (form.elements['dateArrived']) form.elements['dateArrived'].value = ro.dateArrived || '';
 
                 // Handle repair type checkboxes
                 const repairTypes = (ro.repairType || '').split(',').map(t => t.trim());
@@ -5179,6 +5207,11 @@
                     <div class="form-field">
                         <label class="form-label">Promised Date</label>
                         <input type="date" class="form-input" name="promisedDate">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label">Date RV Arrived on Lot</label>
+                        <input type="date" class="form-input" name="dateArrived">
+                        <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 4px;">Leave blank if RV is Not On Lot yet. Set when RV physically arrives.</div>
                     </div>
                     <div class="form-field full-width">
                         <label class="form-label">RO Status Notes</label>
