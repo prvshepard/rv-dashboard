@@ -1077,7 +1077,7 @@
             border-color: var(--status-parts);
         }
 
-        .status-dropdown.status-quality-check {
+        .status-dropdown.status-waiting-for-qa-qc {
             background: rgba(94, 92, 230, 0.2);
             color: var(--status-check);
             border-color: var(--status-check);
@@ -1762,7 +1762,7 @@
                         <button class="filter-btn" data-filter="Awaiting parts" data-type="status">Awaiting Parts</button>
                         <button class="filter-btn" data-filter="In progress" data-type="status">In Progress</button>
                         <button class="filter-btn" data-filter="Repairs Completed" data-type="status">Repairs Completed</button>
-                        <button class="filter-btn" data-filter="Quality check" data-type="status">Quality Check</button>
+                        <button class="filter-btn" data-filter="Waiting for QA/QC" data-type="status">Waiting for QA/QC</button>
                         <button class="filter-btn" data-filter="Ready for pickup" data-type="status">Ready for Pickup</button>
                         <button class="filter-btn" data-filter="Delivered/Cashed Out" data-type="status">Delivered/Cashed Out</button>
                     </div>
@@ -1981,7 +1981,7 @@
                 dateReceived: "2026-02-25",
                 percentComplete: 75,
                 dollarValue: 2200,
-                status: "Quality check",
+                status: "Waiting for QA/QC",
                 urgency: "Medium",
                 customerType: "Regular",
                 promisedDate: "2026-03-06",
@@ -2168,7 +2168,7 @@
             'Awaiting parts': 30,
             'In progress': 60,
             'Repairs Completed': 80,
-            'Quality check': 85,
+            'Waiting for QA/QC': 85,
             'Ready for pickup': 95,
             'Delivered/Cashed Out': 100
         };
@@ -3038,7 +3038,7 @@
                                 <option value="Awaiting parts" ${ro.status === 'Awaiting parts' ? 'selected' : ''}>Awaiting Parts</option>
                                 <option value="In progress" ${ro.status === 'In progress' ? 'selected' : ''}>In Progress</option>
                                 <option value="Repairs Completed" ${ro.status === 'Repairs Completed' ? 'selected' : ''}>Repairs Completed</option>
-                                <option value="Quality check" ${ro.status === 'Quality check' ? 'selected' : ''}>Quality Check</option>
+                                <option value="Waiting for QA/QC" ${ro.status === 'Waiting for QA/QC' ? 'selected' : ''}>Waiting for QA/QC</option>
                                 <option value="Ready for pickup" ${ro.status === 'Ready for pickup' ? 'selected' : ''}>Ready for Pickup</option>
                                 <option value="Delivered/Cashed Out" ${ro.status === 'Delivered/Cashed Out' ? 'selected' : ''}>Delivered/Cashed Out</option>
                             </select>
@@ -4986,7 +4986,7 @@
                             <option value="Awaiting parts">Awaiting parts</option>
                             <option value="In progress">In progress</option>
                             <option value="Repairs Completed">Repairs Completed</option>
-                            <option value="Quality check">Quality check</option>
+                            <option value="Waiting for QA/QC">Waiting for QA/QC</option>
                             <option value="Ready for pickup">Ready for pickup</option>
                             <option value="Delivered/Cashed Out">Delivered/Cashed Out</option>
                         </select>
