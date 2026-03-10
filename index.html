@@ -2926,6 +2926,14 @@
             if (score >= 80) return 'medium';
             return 'low';
         }
+        
+        function getDaysHeatColor(days) {
+            if (days <= 30) return 'var(--text-primary)'; // Default
+            if (days <= 40) return '#FF8C00'; // Orange
+            if (days <= 50) return '#FF4500'; // Orange-red
+            if (days <= 60) return '#FF1744'; // Red-pink
+            return '#FF1493'; // Neon pink (hottest)
+        }
 
         function renderBoard() {
             const grid = document.getElementById('boardGrid');
@@ -3005,7 +3013,7 @@
                         ${shouldShow('daysOnLot') || shouldShow('dollarValue') ? `
                         <div class="card-header-row">
                             ${shouldShow('daysOnLot') ? `
-                            <div class="days-on-lot">
+                            <div class="days-on-lot" style="color: ${getDaysHeatColor(calculateDaysOnLot(ro.dateReceived))};">
                                 ${calculateDaysOnLot(ro.dateReceived)} <span class="days-label">Days</span>
                             </div>
                             ` : ''}
@@ -3521,7 +3529,12 @@
             document.getElementById('statProgress').textContent = inProgress;
             document.getElementById('statParts').textContent = awaitingParts;
             document.getElementById('statAvgDays').textContent = avgDays;
-            document.getElementById('statLongestWait').textContent = longestWait;
+            
+            // Apply heat color to longest wait
+            const longestWaitEl = document.getElementById('statLongestWait');
+            longestWaitEl.textContent = longestWait;
+            longestWaitEl.style.color = getDaysHeatColor(longestWait);
+            
             document.getElementById('totalRVs').textContent = `${filtered} RVs on Lot`;
             
             // Dynamic stats based on view mode
