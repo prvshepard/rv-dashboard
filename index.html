@@ -375,6 +375,11 @@
             background: var(--accent-info);
         }
 
+        /* Dynamic repair-filter cards use inline border-left; suppress the ::before stripe */
+        #statDynamicRepairCards .stat-card::before {
+            display: none;
+        }
+
         .stat-label {
             font-size: 0.85rem;
             color: var(--text-secondary);
@@ -1784,6 +1789,7 @@
             <div class="stat-card" id="statDynamicStatusCard" style="display: none;">
                 <div id="statDynamicStatusContent"></div>
             </div>
+            <div id="statDynamicRepairCards" style="display: contents;"></div>
             <div class="stat-card" id="statProgressCard">
                 <div class="stat-label">In Progress</div>
                 <div class="stat-value" id="statProgress">0</div>
@@ -3537,38 +3543,77 @@
             
             document.getElementById('totalRVs').textContent = `${filtered} RVs on Lot`;
             
-            // Dynamic stats based on view mode
+            // Status color map for the left border accent on dynamic cards
+            const statusColorMap = {
+                'Not On Lot':        '#9ca3af',
+                'On Lot':            '#34c759',
+                'Awaiting Approval': '#ffcc00',
+                'Awaiting parts':    '#ff9500',
+                'In progress':       '#0a84ff',
+                'Repairs Completed': '#5e5ce6',
+                'Waiting for QA/QC': '#5e5ce6',
+                'Ready for pickup':  '#34c759',
+                'Delivered/Cashed Out': '#6b7280'
+            };
+
+            const ALL_STATUSES = [
+                'Not On Lot', 'On Lot', 'Awaiting Approval', 'Awaiting parts',
+                'In progress', 'Repairs Completed', 'Waiting for QA/QC',
+                'Ready for pickup', 'Delivered/Cashed Out'
+            ];
+
             const isCondensedOrRegular = (currentViewMode === 'condensed' || currentViewMode === 'regular');
             const progressCard = document.getElementById('statProgressCard');
             const partsCard = document.getElementById('statPartsCard');
             const dynamicCard = document.getElementById('statDynamicStatusCard');
             const dynamicContent = document.getElementById('statDynamicStatusContent');
-            
-            if (isCondensedOrRegular) {
-                // Hide default status cards
+            const repairCardsContainer = document.getElementById('statDynamicRepairCards');
+
+            // --- Case 1: A repair type filter is active ---
+            if (currentRepairFilter !== 'all' && filteredData) {
+                // Hide default static cards
                 if (progressCard) progressCard.style.display = 'none';
                 if (partsCard) partsCard.style.display = 'none';
-                
-                // Show dynamic status card if filters are active
+                if (dynamicCard) dynamicCard.style.display = 'none';
+
+                // Build one card per status that has count > 0
+                const cards = ALL_STATUSES.map(status => {
+                    const count = filteredData.filter(ro => ro.status === status).length;
+                    if (count === 0) return '';
+                    const color = statusColorMap[status] || 'var(--accent-info)';
+                    return `
+                        <div class="stat-card" style="--card-accent: ${color}; border-left: 4px solid ${color};">
+                            <div class="stat-label">${status}</div>
+                            <div class="stat-value" style="color: ${color};">${count}</div>
+                        </div>`;
+                }).join('');
+
+                if (repairCardsContainer) repairCardsContainer.innerHTML = cards;
+
+            // --- Case 2: Condensed/Regular with status filters active ---
+            } else if (isCondensedOrRegular) {
+                // Clear repair cards
+                if (repairCardsContainer) repairCardsContainer.innerHTML = '';
+                if (progressCard) progressCard.style.display = 'none';
+                if (partsCard) partsCard.style.display = 'none';
+
                 if (currentStatusFilters.length > 0 && filteredData) {
-                    // Calculate counts for each selected status
                     const statusCounts = currentStatusFilters.map(status => {
                         const count = filteredData.filter(ro => ro.status === status).length;
                         return { status, count };
                     });
-                    
-                    // Build combined status display
                     const statusHTML = statusCounts.map(({ status, count }) => {
                         return `<div style="margin-bottom: 6px;"><span style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">${status}</span><div style="font-size: 1.8rem; font-weight: 700; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">${count}</div></div>`;
                     }).join('');
-                    
                     dynamicContent.innerHTML = statusHTML;
                     dynamicCard.style.display = 'block';
                 } else {
                     dynamicCard.style.display = 'none';
                 }
+
+            // --- Case 3: Default / Expanded view ---
             } else {
-                // Expanded view - show all default cards
+                if (repairCardsContainer) repairCardsContainer.innerHTML = '';
                 if (progressCard) progressCard.style.display = 'block';
                 if (partsCard) partsCard.style.display = 'block';
                 if (dynamicCard) dynamicCard.style.display = 'none';
