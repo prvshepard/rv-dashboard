@@ -2712,10 +2712,10 @@
             setInterval(updateClock, 1000);
             
             // Check for saved authentication token - retry until libraries load
-            const checkAuth = () => {
+            const checkAuth = async () => {
                 if (gapiInited && gisInited) {
                     console.log('📡 Libraries loaded, checking for saved token...');
-                    loadSavedToken();
+                    await loadSavedToken();
                 } else {
                     console.log('⏳ Waiting for Google libraries...');
                     setTimeout(checkAuth, 200);
@@ -3602,7 +3602,7 @@
         }
 
         // Load saved token on page load
-        function loadSavedToken() {
+        async function loadSavedToken() {
             console.log('🔍 loadSavedToken called');
             const savedToken = localStorage.getItem('google_access_token');
             const tokenExpiry = localStorage.getItem('google_token_expiry');
