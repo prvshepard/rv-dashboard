@@ -1051,7 +1051,7 @@
                         const normalizedName = (customerName || '').replace(/\s+/g, '-');
                         const constructedRoId = `RO-${normalizedName}-${dateReceived}`;
                         
-                        console.log(`Row ${i}: constructed="${constructedRoId}" vs url="${roId}"`);
+                        console.log(`Row ${i}: name="${customerName}" date="${dateReceived}" constructed="${constructedRoId}" vs url="${roId}"`);
                         
                         if (constructedRoId === roId) {
                             // Found matching RO!
