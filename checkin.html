@@ -1258,13 +1258,18 @@
             const today = new Date().toISOString().split('T')[0];
             const logId = `LOG-${Date.now()}`;
             
+            // Capture selected service types at check-in time
+            const checkedServicesAtStart = Array.from(document.querySelectorAll('input[name="serviceType"]:checked')).map(cb => cb.value);
+            const serviceTypeAtStart = checkedServicesAtStart.join(', ');
+
             currentSession = {
                 logId: logId,
                 roId: roId,
                 tech: currentUser.name,
                 techEmail: currentUser.email,
                 checkIn: now,
-                checkOut: null
+                checkOut: null,
+                serviceType: serviceTypeAtStart
             };
             
             // Save locally first
@@ -1349,11 +1354,10 @@
             const now = new Date().toISOString();
             const duration = calculateDuration(currentSession.checkIn, now);
             
-            // Capture work notes and selected service types
+            // Capture work notes — use serviceType saved at check-in time
             const workNotesEl = document.getElementById('workNotes');
             const workNotes = workNotesEl ? workNotesEl.value.trim() : '';
-            const checkedServices = Array.from(document.querySelectorAll('input[name="serviceType"]:checked')).map(cb => cb.value);
-            const serviceTypeStr = checkedServices.join(', ');
+            const serviceTypeStr = currentSession.serviceType || '';
             
             currentSession.checkOut = now;
             currentSession.duration = duration;
