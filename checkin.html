@@ -1051,11 +1051,11 @@
                         const normalizedName = (customerName || '').replace(/\s+/g, '-');
                         const constructedRoId = `RO-${normalizedName}-${dateReceived}`;
                         
-                        console.log(`Row ${i}: name="${customerName}" date="${dateReceived}" constructed="${constructedRoId}" vs url="${roId}"`);
+
                         
                         if (constructedRoId === roId) {
                             // Found matching RO!
-                            console.log('✅ Found RO in Sheets:', customerName, '| repairType:', row[6]);
+                            console.log('✅ Found RO in Sheets:', customerName);
                             roData = {
                                 id: roId,
                                 customer: customerName,
@@ -1116,10 +1116,7 @@
                         <span class="info-label">Status:</span>
                         <span class="info-value">${roData ? roData.status : 'N/A'}</span>
                     </div>
-                    <div class="info-row">
-                        <span class="info-label">Service Types:</span>
-                        <span class="info-value" style="color: #3b82f6;">${roData && roData.repairType ? roData.repairType : '(loading...)'}</span>
-                    </div>
+
                     ${currentUser ? `
                     <div class="info-row">
                         <span class="info-label">Tech:</span>
@@ -1147,12 +1144,11 @@
                             const types = (roData && roData.repairType && roData.repairType !== 'Various' && roData.repairType !== '')
                                 ? roData.repairType.split(',').map(t => t.trim()).filter(Boolean)
                                 : [];
-                            // Debug: log what we have
-                            console.log('Service types for checkboxes:', types, '| repairType raw:', roData && roData.repairType);
+
                             if (types.length === 0) return '';
                             return `
-                            <div style="margin-bottom: 16px;">
-                                <div style="font-weight: 700; color: #1e293b; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">🔧 Service Type</div>
+                            <div class="service-type-section" style="margin-bottom: 16px;">
+                                <div style="font-weight: 700; color: #1e293b; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">🔧 Service Type <span style="color: #ef4444;">*</span></div>
                                 <div style="display: flex; flex-wrap: wrap; gap: 10px;">
                                     ${types.map(t => `
                                         <label style="display: flex; align-items: center; gap: 8px; background: #f1f5f9; border: 2px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.15s ease;">
@@ -1195,7 +1191,7 @@
                             ⏹️ End Work
                         </button>
                     ` : `
-                        <button class="btn btn-start" onclick="checkIn()">
+                        <button class="btn btn-start" onclick="validateAndCheckIn()">
                             ▶️ Start Work
                         </button>
                     `)}
@@ -1215,6 +1211,30 @@
             if (isCheckedIn) {
                 startTimer();
             }
+        }
+
+        function validateAndCheckIn() {
+            // If this RO has service types, require at least one to be selected
+            const checkboxes = document.querySelectorAll('input[name="serviceType"]');
+            if (checkboxes.length > 0) {
+                const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+                if (!anyChecked) {
+                    // Highlight the service type section
+                    const serviceSection = document.querySelector('.service-type-section');
+                    if (serviceSection) {
+                        serviceSection.style.border = '2px solid #ef4444';
+                        serviceSection.style.borderRadius = '8px';
+                        serviceSection.style.padding = '10px';
+                        setTimeout(() => {
+                            serviceSection.style.border = '';
+                            serviceSection.style.padding = '';
+                        }, 2000);
+                    }
+                    alert('Please select at least one Service Type before starting work.');
+                    return;
+                }
+            }
+            checkIn();
         }
 
         async function checkIn() {
