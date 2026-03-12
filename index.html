@@ -4651,8 +4651,9 @@
 
                 const response = await gapi.client.sheets.spreadsheets.values.append({
                     spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
-                    range: 'Sheet1!A:U',
+                    range: 'Sheet1!A1',
                     valueInputOption: 'RAW',
+                    insertDataOption: 'INSERT_ROWS',
                     resource: { values }
                 });
 
