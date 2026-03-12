@@ -2261,7 +2261,7 @@
                 }
 
                 // Update Google Sheets - Urgency is column N (14th column)
-                const rowNumber = originalIndex + 2; // +2 for header and 0-based index
+                const rowNumber = await getSheetRowNumber(originalIndex); if (!rowNumber) return;
                 const range = `Sheet1!N${rowNumber}`;
 
                 console.log('Updating sheet row:', rowNumber, 'with urgency:', newUrgency);
@@ -2370,7 +2370,7 @@
                 console.log('Updated', fieldName, 'for:', ro.customerName);
 
                 // Update Google Sheets
-                const rowNumber = originalIndex + 2; // +2 for header and 0-based index
+                const rowNumber = await getSheetRowNumber(originalIndex); if (!rowNumber) return;
                 const range = `Sheet1!${field.column}${rowNumber}`;
 
                 console.log('Updating sheet range:', range);
@@ -2432,7 +2432,7 @@
                 }
 
                 // Update Google Sheets - Progress is column K (11th column)
-                const rowNumber = originalIndex + 2;
+                const rowNumber = await getSheetRowNumber(originalIndex); if (!rowNumber) return;
                 const range = `Sheet1!K${rowNumber}`;
 
                 console.log('Updating sheet row:', rowNumber, 'with progress:', newProgress);
@@ -2512,7 +2512,7 @@
                 }
 
                 // Update Google Sheets - Status is column M (13th), Progress is column K (11th), DateArrived is column S (19th)
-                const rowNumber = originalIndex + 2; // +2 for header and 0-based index
+                const rowNumber = await getSheetRowNumber(originalIndex); if (!rowNumber) return;
                 
                 const batchData = [
                     { range: `Sheet1!K${rowNumber}`, values: [[autoProgress]] },
@@ -2642,7 +2642,7 @@
         }
 
         async function updatePhotoLibraryInSheet(libraryJson, originalIndex) {
-            const rowNumber = originalIndex + 2;
+            const rowNumber = await getSheetRowNumber(originalIndex); if (!rowNumber) return;
             await gapi.client.sheets.spreadsheets.values.update({
                 spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
                 range: `Sheet1!T${rowNumber}`,
@@ -2789,7 +2789,7 @@
 
         async function updatePhotoInSheet(photoUrl, originalIndex, libraryJson) {
             try {
-                const rowNumber = originalIndex + 2;
+                const rowNumber = await getSheetRowNumber(originalIndex); if (!rowNumber) return;
                 await gapi.client.sheets.spreadsheets.values.batchUpdate({
                     spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
                     resource: {
@@ -4439,9 +4439,53 @@
             // Nothing to do here; this function is kept for compatibility.
         }
 
+        // Helper: find the actual 1-indexed sheet row for a given currentData index
+        // Matches on customerName + dateReceived to avoid row-offset bugs
+        async function getSheetRowNumber(dataIndex) {
+            const targetName = currentData[dataIndex].customerName;
+            const targetDate = currentData[dataIndex].dateReceived;
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                range: 'Sheet1!A:J',
+            });
+            const rows = response.result.values || [];
+            for (let i = 1; i < rows.length; i++) {
+                if (rows[i][0] === targetName && rows[i][9] === targetDate) {
+                    return i + 1; // 1-indexed sheet row
+                }
+            }
+            console.error('getSheetRowNumber: could not find row for', targetName, targetDate);
+            return null;
+        }
+
         async function updateROInSheets(roIndex, formData) {
             try {
-                const rowNumber = roIndex + 2; // +2 for header and 0-based index
+                // Look up the actual sheet row by fetching current sheet data and matching
+                // customerName + dateReceived — never assume roIndex+2 matches sheet row
+                const lookupResponse = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: 'Sheet1!A:J',
+                });
+
+                const rows = lookupResponse.result.values || [];
+                const targetName = currentData[roIndex].customerName;
+                const targetDate = currentData[roIndex].dateReceived;
+
+                let rowNumber = -1;
+                for (let i = 1; i < rows.length; i++) {
+                    if (rows[i][0] === targetName && rows[i][9] === targetDate) {
+                        rowNumber = i + 1; // +1 because sheets are 1-indexed
+                        break;
+                    }
+                }
+
+                if (rowNumber === -1) {
+                    console.error('Could not find row in sheet for:', targetName, targetDate);
+                    alert('Error: Could not locate this RO in the spreadsheet. Please refresh and try again.');
+                    return false;
+                }
+
+                console.log(`Matched "${targetName}" (${targetDate}) to sheet row ${rowNumber}`);
                 
                 const values = [[
                     formData.customerName,
