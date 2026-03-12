@@ -4051,6 +4051,10 @@
                 accessToken = resp.access_token;
                 console.log('Access token received');
                 
+                // CRITICAL: Set token in gapi client so API calls work
+                gapi.client.setToken({access_token: accessToken});
+                console.log('✅ Token set in gapi client');
+                
                 // Save token with expiration (default 3600 seconds = 1 hour)
                 const expiresIn = resp.expires_in || 3600;
                 saveToken(accessToken, expiresIn);
