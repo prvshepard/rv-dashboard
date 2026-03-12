@@ -2,7 +2,15 @@
 <!-- 
     PRVS Dashboard v1.12
     Released: 2026-03-12
-    New in v1.12: Hash-based RO ID (PRVS-XXXX-XXXX) generated from CustomerName+RV+DateReceived, stored in Sheet1 Column U, backfilled for existing ROs on load, displayed on each card. getSheetRowNumber now matches by RO ID for reliable sheet writes.
+    New in v1.12:
+    - Hash-based RO ID (PRVS-XXXX-XXXX) generated from CustomerName+RV+DateReceived, stored in Sheet1 Column U
+    - RO ID backfilled for existing ROs on first load after auth (not on every reload)
+    - RO ID displayed on each card in blue monospace
+    - getSheetRowNumber() matches by RO ID first, falls back to name+date — used by all sheet writes
+    - updateROInSheets() consolidated to use getSheetRowNumber() helper (removed duplicate inline lookup)
+    - gapi.client.setToken() now called on fresh login (handleAuthClick) — fixes writes failing after token expiry
+    - New RO append uses explicit column A scan to find true last data row — immune to blank rows and stray data
+    - backfillROIds() only runs once after initial auth, never during saves or reloads
 -->
 <html lang="en">
 <head>
@@ -4656,9 +4664,27 @@
                     newRoId    // Column U — RO ID
                 ]];
 
-                const response = await gapi.client.sheets.spreadsheets.values.append({
+                // Find the true last populated row by reading column A only,
+                // then write directly to the next row — immune to blank rows or stray data
+                const colAResponse = await gapi.client.sheets.spreadsheets.values.get({
                     spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
-                    range: 'Sheet1!A1',
+                    range: 'Sheet1!A:A',
+                });
+                const colARows = colAResponse.result.values || [];
+                // Find last row that has a customer name (skip header at index 0)
+                let lastDataRow = 1; // default to row 1 (header)
+                for (let i = colARows.length - 1; i >= 1; i--) {
+                    if (colARows[i] && colARows[i][0] && colARows[i][0].toString().trim() !== '') {
+                        lastDataRow = i + 1; // convert to 1-indexed sheet row
+                        break;
+                    }
+                }
+                const newRow = lastDataRow + 1;
+                console.log(`Appending new RO to row ${newRow} (last data was row ${lastDataRow})`);
+
+                const response = await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: `Sheet1!A${newRow}:U${newRow}`,
                     valueInputOption: 'RAW',
                     resource: { values }
                 });
