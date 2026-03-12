@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 
-    PRVS Tech Check-In v1.11
-    Released: 2026-03-11
+    PRVS Tech Check-In v1.1
+    Released: 2026-03-10
     Features: QR code check-in/out, work notes with voice dictation, direct button access
 -->
 <html lang="en">
@@ -214,7 +214,7 @@
         </div>
         
         <div style="text-align: center; margin-top: 20px;">
-            <span style="font-size: 0.7rem; color: rgba(255,255,255,0.5); font-family: monospace;">v1.11</span>
+            <span style="font-size: 0.7rem; color: rgba(255,255,255,0.5); font-family: monospace;">v1.0</span>
         </div>
     </div>
 
@@ -224,7 +224,7 @@
         const GOOGLE_CONFIG = {
             CLIENT_ID: '971946834908-fqhmdrie6ntt0mmmbh4rkpaop8edvgr8.apps.googleusercontent.com',
             SPREADSHEET_ID: '1Nkf_BoqDhanJRCyeqIerF-Te_Z_R0h3mZelcgTjS62Y',
-            TIME_LOGS_RANGE: 'Time Logs!A:J',
+            TIME_LOGS_RANGE: 'Time Logs!A:H',
             ADMIN_COMMANDS_RANGE: 'Admin Commands!A:E'
         };
         
@@ -256,7 +256,7 @@
         document.addEventListener('DOMContentLoaded', init);
 
         function init() {
-            console.log('📦 PRVS Tech Check-In v1.11 - Released 2026-03-11');
+            console.log('📦 PRVS Tech Check-In v1.1 - Released 2026-03-10');
             console.log('Check-in page loaded for RO:', roId);
             
             if (!roId) {
@@ -801,8 +801,8 @@
                 return;
             }
             
-            const range = `Time Logs!F${rowIndex}:J${rowIndex}`;
-            const values = [[item.checkOut, item.duration, '', item.serviceType || '', item.workNotes || '']];
+            const range = `Time Logs!F${rowIndex}:G${rowIndex}`;
+            const values = [[item.checkOut, item.duration]];
             
             const response = await fetch(
                 `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_CONFIG.SPREADSHEET_ID}/values/${range}?valueInputOption=USER_ENTERED`,
@@ -991,7 +991,7 @@
                 id: roId,
                 customer: extractedCustomer,
                 status: 'In Progress',
-                repairType: ''  // Will be filled in by loadRODetails after auth
+                repairType: 'Various'
             };
             
             console.log('RO Data set to:', roData);
@@ -1031,7 +1031,7 @@
                 // Fetch RO details from Google Sheets to get accurate customer name
                 console.log('Fetching RO details from Sheets...');
                 const response = await fetch(
-                    `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_CONFIG.SPREADSHEET_ID}/values/Sheet1!A:S`,
+                    `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_CONFIG.SPREADSHEET_ID}/values/Sheet1!A:J`,
                     {
                         headers: { 'Authorization': `Bearer ${accessToken}` }
                     }
@@ -1042,16 +1042,11 @@
                     const rows = data.values || [];
                     
                     // Find the RO by matching the RO ID pattern
-                    // RO IDs have spaces replaced with hyphens, so normalize for comparison
                     for (let i = 1; i < rows.length; i++) {
                         const row = rows[i];
                         const customerName = row[0]; // Column A: Customer Name
                         const dateReceived = row[9]; // Column J: Date Received
-                        // Normalize: replace spaces with hyphens to match URL-encoded RO ID
-                        const normalizedName = (customerName || '').replace(/\s+/g, '-');
-                        const constructedRoId = `RO-${normalizedName}-${dateReceived}`;
-                        
-
+                        const constructedRoId = `RO-${customerName}-${dateReceived}`;
                         
                         if (constructedRoId === roId) {
                             // Found matching RO!
@@ -1061,7 +1056,7 @@
                                 customer: customerName,
                                 rv: row[4] || 'Unknown RV',
                                 status: row[12] || 'In Progress',
-                                repairType: row[6] || ''
+                                repairType: row[6] || 'Various'
                             };
                             renderInterface();
                             return;
@@ -1116,7 +1111,6 @@
                         <span class="info-label">Status:</span>
                         <span class="info-value">${roData ? roData.status : 'N/A'}</span>
                     </div>
-
                     ${currentUser ? `
                     <div class="info-row">
                         <span class="info-label">Tech:</span>
@@ -1132,42 +1126,22 @@
                 </div>
             `;
 
-            // Service type checkboxes - always shown when user is signed in and RO has types
-            const serviceTypes = (roData && roData.repairType && roData.repairType !== 'Various' && roData.repairType !== '')
-                ? roData.repairType.split(',').map(t => t.trim()).filter(Boolean)
-                : [];
-
-            if (currentUser && serviceTypes.length > 0) {
-                html += `
-                    <div class="notes-section" style="margin: 20px 0; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                        <div class="service-type-section" style="margin-bottom: 16px;">
-                            <div style="font-weight: 700; color: #1e293b; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">🔧 Service Type <span style="color: #ef4444;">*</span></div>
-                            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-                                ${serviceTypes.map(t => `
-                                    <label style="display: flex; align-items: center; gap: 8px; background: #f1f5f9; border: 2px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.15s ease;">
-                                        <input type="checkbox" name="serviceType" value="${t}" style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
-                                        ${t}
-                                    </label>
-                                `).join('')}
-                            </div>
-                        </div>
-                        ${isCheckedIn ? `
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 8px;">📝 Work Notes</div>
-                        <button onclick="startVoiceDictation()" style="width: 100%; margin-bottom: 10px; padding: 10px 16px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                            🎤 Dictate Notes
-                        </button>
-                        <textarea id="workNotes" placeholder="Add notes about work performed..." style="width: 100%; min-height: 100px; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical;"></textarea>
-                        <div id="voiceStatus" style="margin-top: 8px; font-size: 12px; color: #64748b;"></div>
-                        ` : ''}
-                    </div>
-                `;
-            }
-
             if (isCheckedIn) {
                 html += `
                     <div class="timer">
                         <h3>Time on Job</h3>
                         <div class="timer-display" id="timerDisplay">00:00:00</div>
+                    </div>
+                    
+                    <div class="notes-section" style="margin: 20px 0; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-weight: 600; color: #1e293b;">
+                            📝 Work Notes
+                            <button onclick="startVoiceDictation()" style="margin-left: auto; padding: 8px 16px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                                🎤 Dictate
+                            </button>
+                        </label>
+                        <textarea id="workNotes" placeholder="Add notes about work performed..." style="width: 100%; min-height: 100px; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical;"></textarea>
+                        <div id="voiceStatus" style="margin-top: 8px; font-size: 12px; color: #64748b;"></div>
                     </div>
                 `;
             }
@@ -1194,7 +1168,21 @@
                             ⏹️ End Work
                         </button>
                     ` : `
-                        <button class="btn btn-start" onclick="validateAndCheckIn()">
+                        <div style="background:#f1f5f9;border-radius:12px;padding:16px;margin-bottom:16px;">
+                            <div style="font-weight:700;color:#1e3a8a;margin-bottom:8px;font-size:15px;">🔧 Service Type <span style="color:#dc2626;">*</span></div>
+                            <div style="font-size:12px;color:#64748b;margin-bottom:12px;">Select all service types for this job:</div>
+                            <div id="serviceTypeBoxes" style="display:flex;flex-wrap:wrap;gap:10px;">
+                                ${['Roof','Solar','Vroom','Paint and Body','Repairs','TrueTopper','Detailing','Chassis'].map(type => {
+                                    const roTypes = (roData && roData.repairType ? roData.repairType : '').split(',').map(t => t.trim());
+                                    const chk = roTypes.includes(type);
+                                    const bg = chk ? '#dbeafe' : 'white';
+                                    const bdr = chk ? '#3b82f6' : '#e2e8f0';
+                                    return `<label style="display:flex;align-items:center;gap:6px;background:${bg};border:2px solid ${bdr};border-radius:8px;padding:8px 12px;cursor:pointer;font-size:14px;font-weight:600;color:#1e293b;" onclick="toggleServiceLabel(this)"><input type="checkbox" name="serviceType" value="${type}" ${chk?'checked':''} style="accent-color:#3b82f6;width:16px;height:16px;">${type}</label>`;
+                                }).join('')}
+                            </div>
+                            <div id="serviceTypeError" style="display:none;color:#dc2626;font-size:12px;margin-top:8px;font-weight:600;">⚠️ Please select at least one service type.</div>
+                        </div>
+                        <button class="btn btn-start" id="startWorkBtn" onclick="checkIn()">
                             ▶️ Start Work
                         </button>
                     `)}
@@ -1213,31 +1201,40 @@
 
             if (isCheckedIn) {
                 startTimer();
+            } else {
+                // Set initial Start Work button state based on checkbox selections
+                updateStartButton();
             }
         }
 
-        function validateAndCheckIn() {
-            // If this RO has service types, require at least one to be selected
-            const checkboxes = document.querySelectorAll('input[name="serviceType"]');
-            if (checkboxes.length > 0) {
-                const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
-                if (!anyChecked) {
-                    // Highlight the service type section
-                    const serviceSection = document.querySelector('.service-type-section');
-                    if (serviceSection) {
-                        serviceSection.style.border = '2px solid #ef4444';
-                        serviceSection.style.borderRadius = '8px';
-                        serviceSection.style.padding = '10px';
-                        setTimeout(() => {
-                            serviceSection.style.border = '';
-                            serviceSection.style.padding = '';
-                        }, 2000);
-                    }
-                    alert('Please select at least one Service Type before starting work.');
-                    return;
+        function toggleServiceLabel(label) {
+            const input = label.querySelector('input');
+            // After onclick fires, checkbox state has already toggled
+            const isNowChecked = input.checked;
+            label.style.background = isNowChecked ? '#dbeafe' : 'white';
+            label.style.borderColor = isNowChecked ? '#3b82f6' : '#e2e8f0';
+            updateStartButton();
+        }
+        
+        function updateStartButton() {
+            const btn = document.getElementById('startWorkBtn');
+            const errEl = document.getElementById('serviceTypeError');
+            const checked = document.querySelectorAll('input[name="serviceType"]:checked');
+            if (btn) {
+                if (checked.length > 0) {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    if (errEl) errEl.style.display = 'none';
+                } else {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.45';
                 }
             }
-            checkIn();
+        }
+        
+        function getSelectedServiceTypes() {
+            const checked = document.querySelectorAll('input[name="serviceType"]:checked');
+            return Array.from(checked).map(c => c.value).join(', ');
         }
 
         async function checkIn() {
@@ -1254,14 +1251,18 @@
                 }
             }
             
+            // Validate service types selected
+            const selectedServiceTypes = getSelectedServiceTypes();
+            if (!selectedServiceTypes) {
+                const errEl = document.getElementById('serviceTypeError');
+                if (errEl) errEl.style.display = 'block';
+                return;
+            }
+            
             const now = new Date().toISOString();
             const today = new Date().toISOString().split('T')[0];
             const logId = `LOG-${Date.now()}`;
             
-            // Capture selected service types at check-in time
-            const checkedServicesAtStart = Array.from(document.querySelectorAll('input[name="serviceType"]:checked')).map(cb => cb.value);
-            const serviceTypeAtStart = checkedServicesAtStart.join(', ');
-
             currentSession = {
                 logId: logId,
                 roId: roId,
@@ -1269,7 +1270,7 @@
                 techEmail: currentUser.email,
                 checkIn: now,
                 checkOut: null,
-                serviceType: serviceTypeAtStart
+                serviceTypes: selectedServiceTypes
             };
             
             // Save locally first
@@ -1304,7 +1305,7 @@
                     currentUser.name,
                     now,
                     '',
-                    '',
+                    selectedServiceTypes,
                     today
                 ]];
                 
@@ -1354,15 +1355,8 @@
             const now = new Date().toISOString();
             const duration = calculateDuration(currentSession.checkIn, now);
             
-            // Capture work notes — use serviceType saved at check-in time
-            const workNotesEl = document.getElementById('workNotes');
-            const workNotes = workNotesEl ? workNotesEl.value.trim() : '';
-            const serviceTypeStr = currentSession.serviceType || '';
-            
             currentSession.checkOut = now;
             currentSession.duration = duration;
-            currentSession.workNotes = workNotes;
-            currentSession.serviceType = serviceTypeStr;
             
             // Stop timer and remove visibility listener
             if (timerInterval) {
@@ -1380,9 +1374,7 @@
                 logId: currentSession.logId,
                 rowIndex: currentSession.rowIndex,
                 checkOut: now,
-                duration: duration,
-                workNotes: workNotes,
-                serviceType: serviceTypeStr
+                duration: duration
             };
             
             if (!isOnline || !accessToken || !currentSession.rowIndex) {
@@ -1398,8 +1390,8 @@
             console.log('Updating check-out in Google Sheets...');
             
             try {
-                const range = `Time Logs!F${currentSession.rowIndex}:J${currentSession.rowIndex}`;
-                const values = [[now, duration, '', serviceTypeStr, workNotes]];
+                const range = `Time Logs!F${currentSession.rowIndex}:G${currentSession.rowIndex}`;
+                const values = [[now, duration]];
                 
                 const response = await fetch(
                     `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_CONFIG.SPREADSHEET_ID}/values/${range}?valueInputOption=USER_ENTERED`,
