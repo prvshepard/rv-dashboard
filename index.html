@@ -459,6 +459,16 @@
             border-color: var(--accent-info);
         }
 
+        .ro-card.ro-card-status-waiting-for-qa-qc {
+            border-color: #FF1493;
+            box-shadow: 0 0 12px rgba(255, 20, 147, 0.3);
+        }
+
+        .ro-card.ro-card-status-waiting-for-qa-qc:hover {
+            border-color: #FF1493;
+            box-shadow: 0 0 24px rgba(255, 20, 147, 0.5);
+        }
+
         .priority-badge {
             position: absolute;
             top: 0;
@@ -3103,7 +3113,7 @@
                 const statusClass = ro.status.toLowerCase().replace(/\s+/g, '-');
                 
                 return `
-                    <div class="ro-card" data-ro-index="${index}">
+                    <div class="ro-card ro-card-status-${statusClass}" data-ro-index="${index}">
                         ${shouldShow('urgencySelector') ? `
                         <div class="urgency-selector-badge">
                             <select class="urgency-dropdown urgency-${(ro.urgency || 'Medium').toLowerCase()}" 
