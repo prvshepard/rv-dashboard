@@ -4406,70 +4406,18 @@
             return `${hours}h`;
         }
         
-        // Add access token to Drive image URLs for authentication
-        // Uses thumbnail API (sz=w400) instead of alt=media — much faster, no full file download
-        async function loadDriveImage(url, size) {
-            if (!url || !url.includes('drive.google.com')) {
-                return url;
-            }
-
-            if (!accessToken) {
-                return url;
-            }
-
-            try {
-                // Extract file ID from Drive URL
-                const fileIdMatch = url.match(/id=([^&]+)/);
-                if (!fileIdMatch) return url;
-
-                const fileId = fileIdMatch[1];
-                const sz = size || 'w400';
-
-                // Use thumbnail endpoint — tiny payload vs full alt=media download
-                const response = await fetch(
-                    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&fields=id`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`
-                        }
-                    }
-                );
-
-                // Prefer thumbnail URL with token appended — avoids downloading full file
-                const thumbResponse = await fetch(
-                    `https://drive.google.com/thumbnail?id=${fileId}&sz=${sz}`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`
-                        }
-                    }
-                );
-
-                if (!thumbResponse.ok) {
-                    console.warn('Failed to fetch Drive thumbnail:', url);
-                    return url;
-                }
-
-                const blob = await thumbResponse.blob();
-                return URL.createObjectURL(blob);
-            } catch (error) {
-                console.error('Error loading Drive image:', error);
-                return url;
-            }
+        // Drive thumbnail URLs (sz=w200, sz=w400) load fine directly as <img src> tags.
+        // fetch() is blocked by CORS on the thumbnail endpoint, so we just return the URL as-is.
+        // Only use the Drive API (alt=media) for non-thumbnail full file downloads if ever needed.
+        function loadDriveImage(url) {
+            // Thumbnails load natively in <img> tags — no fetch needed
+            return Promise.resolve(url);
         }
 
-        // Apply Drive image loading to all images on the page — runs in parallel for speed
-        async function loadAllDriveImages() {
-            const images = Array.from(document.querySelectorAll('img[src*="drive.google.com"]'));
-            // Determine size hint: modal thumbnails use w200, card photos use w400
-            await Promise.all(images.map(async (img) => {
-                const originalSrc = img.getAttribute('data-original-src') || img.src;
-                img.setAttribute('data-original-src', originalSrc);
-                // Use smaller size for grid thumbnails (modal), larger for RO cards
-                const size = originalSrc.includes('sz=w200') ? 'w200' : 'w400';
-                const dataUrl = await loadDriveImage(originalSrc, size);
-                img.src = dataUrl;
-            }));
+        // Apply Drive thumbnail URLs directly to img tags — no fetch, no CORS issues
+        function loadAllDriveImages() {
+            // Thumbnail URLs already set as img src — browser loads them natively.
+            // Nothing to do here; this function is kept for compatibility.
         }
 
         async function updateROInSheets(roIndex, formData) {
