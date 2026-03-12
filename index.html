@@ -3731,6 +3731,7 @@
 
         let gapiInited = false;
         let gisInited = false;
+        let initialLoadDone = false; // Ensures backfillROIds only runs once on first load
         let tokenClient;
         let accessToken = null;
         let currentUser = null; // Store logged-in user info
@@ -4201,8 +4202,11 @@
                 console.log('Loaded', data.length, 'records from sheet');
                 renderBoard();
 
-                // Backfill any ROs that don't yet have a roId in column U
-                backfillROIds().catch(e => console.warn('backfillROIds error:', e));
+                // Backfill RO IDs into column U — only on first load, not every reload
+                if (!initialLoadDone) {
+                    initialLoadDone = true;
+                    backfillROIds().catch(e => console.warn('backfillROIds error:', e));
+                }
             } catch (err) {
                 console.error('Error loading from Sheets:', err);
                 alert('Error loading data from Google Sheets. Check console for details.');
