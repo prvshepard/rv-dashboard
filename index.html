@@ -1,15 +1,11 @@
 <!DOCTYPE html>
 <!-- 
-    PRVS Dashboard v1.13
-    Released: 2026-03-12
-    New in v1.13:
-    - Edit RO rebuilt as dedicated modal — only edits Customer Name, Phone, Email, Address, RV, Repair Type, Tech, Dollar Value, Promised Date, Date Arrived
-    - Edit RO no longer touches Status, Notes, Repair Description, or any other preserved fields
-    - Audit Log system: writes one row per changed field to "Audit Log" sheet tab after every Edit RO save
-    - Token refresh fixed — callback moved to gisLoaded() so silent refresh always restores gapi.client token
-    - Multi-photo upload: file picker now accepts multiple images in one selection, shows live upload progress
-    - QA/QC neon pink styling fixed — slash in status name was generating invalid CSS class, now stripped
-    - Same slash fix applies to Delivered/Cashed Out status class
+    PRVS Dashboard v1.14
+    Released: 2026-03-15
+    New in v1.14:
+    - Archive system: Archive button on Delivered/Cashed Out cards moves RO to Cashiered sheet tab
+    - Auto-archive via Google Apps Script (Saturday 5PM) handled server-side
+    - Analytics page (analytics.html) for admin financial reporting from Cashiered tab
 -->
 <html lang="en">
 <head>
@@ -598,6 +594,36 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(255, 204, 0, 0.3);
         }
+        .archive-ro-btn {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-elevated);
+            border: 2px solid #FFD700;
+            border-radius: 8px;
+            color: #FFD700;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .archive-ro-btn.visible {
+            display: block;
+        }
+
+        .archive-ro-btn:hover {
+            background: #FFD700;
+            color: #0d0f12;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+        }
+
+
 
         .photo-upload-btn:hover {
             background: var(--accent-low);
@@ -1749,7 +1775,7 @@
                 <span id="totalRVs">0 RVs on Lot</span>
             </div>
             <div style="text-align: right; margin-top: 8px;">
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.13</span>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.14</span>
             </div>
         </header>
 
@@ -2828,9 +2854,82 @@
             }
         }
 
+        // Archive an RO to the Cashiered sheet tab and remove from Sheet1
+        async function archiveRO(dataIndex) {
+            if (!isAdmin()) {
+                alert('Admin access required to archive ROs.');
+                return;
+            }
+            const ro = currentData[dataIndex];
+            if (!ro) return;
+
+            const confirmed = confirm(`Archive "${ro.customerName}" (${ro.rv}) to the Cashiered tab?\n\nThis will remove it from the active dashboard.`);
+            if (!confirmed) return;
+
+            try {
+                // Step 1: Get the sheet row number
+                const rowNumber = await getSheetRowNumber(dataIndex);
+                if (!rowNumber) {
+                    alert('Error: Could not locate this RO in the spreadsheet.');
+                    return;
+                }
+
+                // Step 2: Read the full row from Sheet1
+                const readResponse = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: `Sheet1!A${rowNumber}:U${rowNumber}`,
+                });
+                const rowValues = readResponse.result.values ? readResponse.result.values[0] : [];
+
+                // Pad to 21 columns (A–U)
+                while (rowValues.length < 21) rowValues.push('');
+
+                // Step 3: Append to Cashiered tab
+                await gapi.client.sheets.spreadsheets.values.append({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: GOOGLE_CONFIG.CASHIERED_RANGE,
+                    valueInputOption: 'RAW',
+                    resource: { values: [rowValues] }
+                });
+
+                // Step 4: Delete the row from Sheet1
+                // Get the spreadsheet to find the Sheet1 sheetId
+                const spreadsheetMeta = await gapi.client.sheets.spreadsheets.get({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                });
+                const sheet1 = spreadsheetMeta.result.sheets.find(s => s.properties.title === 'Sheet1');
+                if (!sheet1) throw new Error('Sheet1 not found');
+
+                await gapi.client.sheets.spreadsheets.batchUpdate({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    resource: {
+                        requests: [{
+                            deleteDimension: {
+                                range: {
+                                    sheetId: sheet1.properties.sheetId,
+                                    dimension: 'ROWS',
+                                    startIndex: rowNumber - 1,  // 0-indexed
+                                    endIndex: rowNumber         // exclusive
+                                }
+                            }
+                        }]
+                    }
+                });
+
+                // Step 5: Remove from local data and re-render
+                currentData.splice(dataIndex, 1);
+                renderBoard();
+                console.log(`✅ Archived RO for ${ro.customerName} to Cashiered tab`);
+
+            } catch (err) {
+                console.error('Error archiving RO:', err);
+                alert('Error archiving RO. Check console for details.');
+            }
+        }
+
         // Initialize
         function init() {
-            console.log('📦 PRVS Dashboard v1.13 - Released 2026-03-12');
+            console.log('📦 PRVS Dashboard v1.14 - Released 2026-03-12');
             loadSampleData();
             loadViewPreferences(); // Load tile view settings
             setupEventListeners();
@@ -3327,6 +3426,11 @@
                             ✏️ Edit RO
                         </button>
                         ` : ''}
+                        ${isAdmin() && (ro.status === 'Delivered/Cashed Out') ? `
+                        <button class="archive-ro-btn visible" onclick="archiveRO(${index})">
+                            📦 Archive to Cashiered
+                        </button>
+                        ` : ''}
                     </div>
                 `;
             }).join('');
@@ -3751,6 +3855,7 @@
             DRIVE_FOLDER_ID: '1SdOc3FDMN20btqR4iR6rhWXiSG6gXFgv',
             TIME_LOGS_RANGE: 'Time Logs!A:J',
             AUDIT_LOG_RANGE: 'Audit Log!A:G',
+            CASHIERED_RANGE: 'Cashiered!A:U',
             DISCOVERY_DOCS: [
                 'https://sheets.googleapis.com/$discovery/rest?version=v4',
                 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
