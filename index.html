@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <!-- 
-    PRVS Dashboard v1.19
+    PRVS Dashboard v1.20
     Released: 2026-03-15
-    New in v1.19:
+    New in v1.20:
     - Insurance Claim Estimate Scanner — scan/upload estimate image or PDF in New RO and Edit RO modals, Claude vision extracts fields, inline suggestion chips for review and conflict resolution, file saved to Google Drive
 -->
 <html lang="en">
@@ -2053,7 +2053,7 @@
                 <span id="totalRVs">0 RVs on Lot</span>
             </div>
             <div style="text-align: right; margin-top: 8px;">
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.19</span>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.20</span>
             </div>
         </header>
 
@@ -2959,7 +2959,7 @@
 
                     // Parse existing photo library
                     let library = [];
-                    try { library = JSON.parse(currentData[originalIndex].photoLibrary || '[]'); } catch(e) { library = []; }
+                    const parsedLib = parseLibrary(currentData[originalIndex].photoLibrary || ''); library = parsedLib.photos;
 
                     let uploaded = 0;
                     let firstPhotoUrl = null;
@@ -2974,7 +2974,9 @@
                         if (uploadBtn) uploadBtn.textContent = `⏳ Uploading ${uploaded}/${files.length}...`;
                     }
 
-                    const libraryJson = JSON.stringify(library);
+                    const existingParsed = parseLibrary(currentData[originalIndex].photoLibrary || '');
+                    existingParsed.photos = library;
+                    const libraryJson = serializeLibrary(existingParsed);
 
                     if (isFirstPhoto && firstPhotoUrl) {
                         currentData[originalIndex].rvPhotoUrl = firstPhotoUrl;
@@ -3008,52 +3010,183 @@
             });
         }
 
+
+        // ── Photo & Document Library Helpers ────────────────────────
+        // Column T stores: { "photos": [...urls], "docs": [{url,name,type,addedDate},...] }
+        // Legacy format (plain array of URLs) is auto-migrated on read.
+
+        function parseLibrary(raw) {
+            if (!raw) return { photos: [], docs: [] };
+            try {
+                const parsed = JSON.parse(raw);
+                // New format
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.photos !== undefined) {
+                    return { photos: parsed.photos || [], docs: parsed.docs || [] };
+                }
+                // Legacy format — plain array of URLs
+                if (Array.isArray(parsed)) {
+                    return { photos: parsed, docs: [] };
+                }
+                return { photos: [], docs: [] };
+            } catch(e) { return { photos: [], docs: [] }; }
+        }
+
+        function serializeLibrary(library) {
+            return JSON.stringify({ photos: library.photos || [], docs: library.docs || [] });
+        }
+
+        async function addDocToLibrary(originalIndex, docUrl, docName, docType) {
+            const existing = currentData[originalIndex];
+            const library = parseLibrary(existing.photoLibrary || '');
+            library.docs.push({
+                url: docUrl,
+                name: docName || 'Document',
+                type: docType || 'doc',
+                addedDate: new Date().toISOString().slice(0, 10)
+            });
+            const libraryJson = serializeLibrary(library);
+            currentData[originalIndex].photoLibrary = libraryJson;
+            await updatePhotoLibraryInSheet(libraryJson, originalIndex);
+            console.log('✅ Document added to library:', docName);
+        }
+
         function openPhotoLibrary(index) {
             const ro = currentFilteredData[index];
             if (!ro) return;
 
-            let library = [];
-            try { library = JSON.parse(ro.photoLibrary || '[]'); } catch(e) { library = []; }
-
+            const library = parseLibrary(ro.photoLibrary || '');
             const mainUrl = ro.rvPhotoUrl || '';
 
-            const thumbsHtml = library.length === 0
-                ? '<p style="color:#64748b; text-align:center; padding: 20px;">No photos in library yet.</p>'
-                : library.map((url, i) => {
-                    const isMain = url === mainUrl;
-                    return `
-                        <div style="position:relative; border-radius:10px; overflow:hidden; border: 3px solid ${isMain ? '#22c55e' : '#e2e8f0'};">
-                            <img src="${url.includes('sz=w') ? url.replace(/sz=w\d+/, 'sz=w200') : url}" loading="lazy" style="width:100%; height:140px; object-fit:cover; display:block; background:#f1f5f9;" onerror="this.style.opacity='0.3';this.alt='Load error';">
+            const renderPhotosTab = () => {
+                const thumbsHtml = library.photos.length === 0
+                    ? '<p style="color:#64748b;text-align:center;padding:20px;">No photos yet.</p>'
+                    : library.photos.map((url, i) => {
+                        const isMain = url === mainUrl;
+                        return `<div style="position:relative;border-radius:10px;overflow:hidden;border:3px solid ${isMain ? '#22c55e' : '#e2e8f0'};">
+                            <img src="${url.includes('sz=w') ? url.replace(/sz=w\d+/, 'sz=w200') : url}" loading="lazy" style="width:100%;height:140px;object-fit:cover;display:block;background:#f1f5f9;" onerror="this.style.opacity='0.3'">
                             ${isMain
                                 ? '<div style="position:absolute;top:6px;left:6px;background:#22c55e;color:white;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;">⭐ MAIN</div>'
-                                : `<button onclick="setMainPhoto(${index}, '${url}')" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:#3b82f6;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">⭐ Set as Main</button>`
-                            }
+                                : `<button onclick="setMainPhoto(${index}, '${url}')" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:#3b82f6;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">⭐ Set as Main</button>`}
                         </div>`;
-                }).join('');
+                    }).join('');
+                return `
+                    ${library.photos.length > 0 ? '<p style="font-size:12px;color:#94a3b8;margin-bottom:8px;">Tap a photo to set as main.</p>' : ''}
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:16px;">${thumbsHtml}</div>
+                    <button onclick="uploadPhoto(${index}); closePhotoLibrary();" style="width:100%;padding:12px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">📷 Add New Photo</button>`;
+            };
+
+            const renderDocsTab = () => {
+                const docsHtml = library.docs.length === 0
+                    ? '<p style="color:#64748b;text-align:center;padding:20px;">No documents yet.</p>'
+                    : library.docs.map((doc, i) => {
+                        const isPDF = doc.type === 'pdf' || (doc.name || '').toLowerCase().endsWith('.pdf');
+                        const isImg = ['jpg','jpeg','png','gif','webp'].some(ext => (doc.name || '').toLowerCase().endsWith(ext));
+                        const icon = isPDF ? '📄' : isImg ? '🖼️' : '📎';
+                        const preview = isImg
+                            ? `<img src="${doc.url}" loading="lazy" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:6px;" onerror="this.style.display='none'">`
+                            : `<div style="font-size:2.5rem;text-align:center;padding:16px 0;">${icon}</div>`;
+                        return `<div style="background:#f8fafc;border-radius:10px;padding:10px;border:1px solid #e2e8f0;">
+                            ${preview}
+                            <div style="font-size:11px;font-weight:700;color:#475569;word-break:break-all;margin-bottom:4px;">${doc.name || 'Document'}</div>
+                            <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">${doc.addedDate || ''}</div>
+                            <a href="${doc.url}" target="_blank" style="display:block;text-align:center;padding:5px;background:#3b82f6;color:white;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">🔗 Open</a>
+                        </div>`;
+                    }).join('');
+                return `
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:16px;">${docsHtml}</div>
+                    <input type="file" id="docUploadInput_${index}" accept="*/*" style="display:none;" onchange="uploadDocument(${index}, this)">
+                    <button onclick="document.getElementById('docUploadInput_${index}').click()" style="width:100%;padding:12px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">📎 Upload Document</button>`;
+            };
 
             const modalHTML = `
                 <div id="photoLibraryModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="closePhotoLibrary(event)">
-                    <div style="background:white;border-radius:16px;padding:30px;max-width:680px;width:100%;max-height:90vh;overflow-y:auto;" onclick="event.stopPropagation()">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                            <h2 style="color:#1e293b;font-family:'Barlow Condensed',sans-serif;">📷 Photo Library — ${ro.customerName}</h2>
+                    <div style="background:white;border-radius:16px;padding:30px;max-width:700px;width:100%;max-height:90vh;overflow-y:auto;" onclick="event.stopPropagation()">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                            <h2 style="color:#1e293b;font-family:'Barlow Condensed',sans-serif;">📷 Photos &amp; Docs — ${ro.customerName}</h2>
                             <button onclick="closePhotoLibrary()" style="background:#64748b;color:white;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px;font-weight:600;">✕ Close</button>
                         </div>
-                        ${library.length > 0 ? '<p style="font-size:12px;color:#94a3b8;margin-bottom:8px;">Tap a photo to set as main. Images load progressively.</p>' : ''}
-                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:20px;">
-                            ${thumbsHtml}
+                        <!-- Tab switcher -->
+                        <div style="display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;margin-bottom:20px;">
+                            <button id="libTabPhotos" onclick="switchLibTab('photos',${index})" style="flex:1;padding:10px;background:#3b82f6;color:white;border:none;font-weight:700;font-size:0.95rem;cursor:pointer;">📷 Photos (${library.photos.length})</button>
+                            <button id="libTabDocs" onclick="switchLibTab('docs',${index})" style="flex:1;padding:10px;background:#f1f5f9;color:#475569;border:none;font-weight:700;font-size:0.95rem;cursor:pointer;">📎 Documents (${library.docs.length})</button>
                         </div>
-                        <button onclick="uploadPhoto(${index}); closePhotoLibrary();" style="width:100%;padding:14px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">
-                            📷 Add New Photo
-                        </button>
+                        <div id="libTabContent">${renderPhotosTab()}</div>
                     </div>
                 </div>`;
 
+            window._libRenderFns = { photos: renderPhotosTab, docs: renderDocsTab };
             const div = document.createElement('div');
             div.innerHTML = modalHTML;
             document.body.appendChild(div);
-
-            // Load all Drive images in the modal in parallel with auth token
             setTimeout(() => loadAllDriveImages(), 50);
+        }
+
+        function switchLibTab(tab, index) {
+            const photosBtn = document.getElementById('libTabPhotos');
+            const docsBtn = document.getElementById('libTabDocs');
+            const content = document.getElementById('libTabContent');
+            if (!content || !window._libRenderFns) return;
+            if (tab === 'photos') {
+                photosBtn.style.background = '#3b82f6'; photosBtn.style.color = 'white';
+                docsBtn.style.background = '#f1f5f9'; docsBtn.style.color = '#475569';
+            } else {
+                docsBtn.style.background = '#10b981'; docsBtn.style.color = 'white';
+                photosBtn.style.background = '#f1f5f9'; photosBtn.style.color = '#475569';
+            }
+            content.innerHTML = window._libRenderFns[tab]();
+        }
+
+        async function uploadDocument(index, input) {
+            const file = input.files[0];
+            if (!file) return;
+            const ro = currentFilteredData[index];
+            const originalIndex = currentData.findIndex(d =>
+                d.customerName === ro.customerName && d.dateReceived === ro.dateReceived
+            );
+            if (originalIndex === -1) return;
+
+            const uploadBtn = input.nextElementSibling;
+            if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.textContent = '⏳ Uploading...'; }
+
+            try {
+                const metadata = {
+                    name: file.name,
+                    parents: [GOOGLE_CONFIG.DRIVE_FOLDER_ID],
+                };
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', file);
+
+                const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: { Authorization: 'Bearer ' + accessToken },
+                    body: form,
+                });
+                if (!response.ok) throw new Error('Upload failed: ' + response.status);
+                const result = await response.json();
+
+                // Make publicly readable
+                await fetch('https://www.googleapis.com/drive/v3/files/' + result.id + '/permissions', {
+                    method: 'POST',
+                    headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+                });
+
+                const ext = file.name.split('.').pop().toLowerCase();
+                const docType = ext === 'pdf' ? 'pdf' : ['jpg','jpeg','png','gif','webp'].includes(ext) ? 'image' : 'doc';
+                const docUrl = 'https://drive.google.com/file/d/' + result.id + '/view';
+
+                await addDocToLibrary(originalIndex, docUrl, file.name, docType);
+                alert('✅ Document uploaded successfully!');
+                closePhotoLibrary();
+                // Reopen to refresh
+                setTimeout(() => openPhotoLibrary(index), 100);
+            } catch (err) {
+                console.error('Document upload error:', err);
+                alert('Upload failed: ' + err.message);
+                if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = '📎 Upload Document'; }
+            }
+            input.value = '';
         }
 
         function closePhotoLibrary(event) {
@@ -3451,9 +3584,17 @@
                 btn.textContent = '✅ Scan Complete — Review Suggestions Below';
                 btn.disabled = false;
 
-                // Store drive URL for reference
+                // Add scanned estimate to RO document library if we're in edit mode
                 if (driveUrl) {
                     console.log('✅ Estimate stored in Drive:', driveUrl);
+                    if (mode === 'edit' && editingROIndex !== null) {
+                        const docName = 'Insurance_Estimate_' + new Date().toISOString().slice(0,10) + '.pdf';
+                        await addDocToLibrary(editingROIndex, driveUrl, docName, 'pdf');
+                        console.log('✅ Estimate added to document library');
+                    } else if (mode === 'new') {
+                        // Store for later — will be added after RO is saved
+                        window._pendingEstimateDoc = { url: driveUrl, name: 'Insurance_Estimate_' + new Date().toISOString().slice(0,10) + '.pdf', type: 'pdf' };
+                    }
                 }
 
             } catch (err) {
@@ -3780,7 +3921,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
 
         // Initialize
         function init() {
-            console.log('📦 PRVS Dashboard v1.19 - Released 2026-03-12');
+            console.log('📦 PRVS Dashboard v1.20 - Released 2026-03-12');
 
             // Auto-fill saved Anthropic API key into both scan inputs
             const savedAnthropicKey = localStorage.getItem('prvs_anthropic_key');
@@ -4164,8 +4305,8 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                         </button>
                         
                         ${shouldShow('photoUpload') ? `
-                        <button class="photo-upload-btn" onclick="${ro.rvPhotoUrl ? `openPhotoLibrary(${index})` : `uploadPhoto(${index})`}" title="${ro.rvPhotoUrl ? 'Manage Photo Library' : 'Add Photo'}">
-                            📷 ${ro.rvPhotoUrl ? 'Manage Photos' : 'Add Photo'}
+                        <button class="photo-upload-btn" onclick="${ro.rvPhotoUrl ? `openPhotoLibrary(${index})` : `uploadPhoto(${index})`}" title="${ro.rvPhotoUrl ? 'Manage Photos & Docs' : 'Add Photo'}">
+                            📷 ${ro.rvPhotoUrl ? 'Manage Photos & Docs' : 'Add Photo'}
                         </button>
                         ` : ''}
                         
@@ -6229,8 +6370,8 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                 modalOverlay.classList.remove('active');
                 newROForm.reset();
                 window._lastEstimateScan = null;
+                window._pendingEstimateDoc = null;
                 clearAllSuggestions('new');
-                // Reset RO type to standard
                 setROType('standard');
             };
 
@@ -6278,6 +6419,16 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                             const roId = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
                             writeInsuranceData(roId, combinedData, newRoIndex);
                         }
+                    }
+                    // Add pending estimate doc to library if one was scanned
+                    if (window._pendingEstimateDoc) {
+                        const newRoIdx = currentData.findIndex(d =>
+                            d.customerName === data.customerName && d.repairType === data.repairType
+                        );
+                        if (newRoIdx !== -1) {
+                            await addDocToLibrary(newRoIdx, window._pendingEstimateDoc.url, window._pendingEstimateDoc.name, window._pendingEstimateDoc.type);
+                        }
+                        window._pendingEstimateDoc = null;
                     }
                     window._lastEstimateScan = null;
                     closeModal();
