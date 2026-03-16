@@ -3166,7 +3166,7 @@
             if (!file) return;
 
             const apiKey = document.getElementById(mode === 'new' ? 'newScanApiKey' : 'editScanApiKey').value.trim();
-            const btn = document.querySelector(`[onclick="openEstimateScanner('\${mode}')"]`);
+            const btn = document.getElementById(mode === 'new' ? 'newScanBtn' : 'editScanBtn');
 
             btn.disabled = true;
             btn.textContent = '⏳ Uploading to Drive...';
@@ -5987,7 +5987,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                 <label>🔑 Anthropic API Key:</label>
                 <input type="password" id="newScanApiKey" placeholder="sk-ant-... (not stored)">
             </div>
-            <button type="button" class="scan-estimate-btn" onclick="openEstimateScanner('new')">
+            <button type="button" class="scan-estimate-btn" id="newScanBtn" onclick="openEstimateScanner('new')">
                 📋 Scan Insurance Estimate
             </button>
             <input type="file" id="newEstimateFile" accept="image/*,.pdf" style="display:none;" onchange="handleEstimateFile(this, 'new')">
@@ -6154,7 +6154,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                 <label>🔑 Anthropic API Key:</label>
                 <input type="password" id="editScanApiKey" placeholder="sk-ant-... (not stored)">
             </div>
-            <button type="button" class="scan-estimate-btn" onclick="openEstimateScanner('edit')">
+            <button type="button" class="scan-estimate-btn" id="editScanBtn" onclick="openEstimateScanner('edit')">
                 📋 Scan Insurance Estimate
             </button>
             <input type="file" id="editEstimateFile" accept="image/*,.pdf" style="display:none;" onchange="handleEstimateFile(this, 'edit')">
