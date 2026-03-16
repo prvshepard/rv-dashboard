@@ -3492,6 +3492,199 @@
 
 
         // ── Insurance Claim RO Mode ──────────────────────────────────
+
+        // ── Custom Insurance Fields System ───────────────────────────
+
+        let customInsuranceFields = [];
+
+        async function loadCustomFieldConfig() {
+            if (!accessToken) return;
+            try {
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: GOOGLE_CONFIG.CONFIG_RANGE,
+                });
+                const val = response.result.values?.[0]?.[0];
+                if (val) {
+                    const config = JSON.parse(val);
+                    customInsuranceFields = config.insuranceCustomFields || [];
+                    console.log('✅ Loaded', customInsuranceFields.length, 'custom insurance fields');
+                }
+            } catch(e) {
+                console.log('No Config tab found or empty — custom fields starting fresh');
+                customInsuranceFields = [];
+            }
+            renderCustomFields('new');
+            renderCustomFields('edit');
+        }
+
+        async function saveCustomFieldConfig() {
+            if (!accessToken) return;
+            try {
+                const config = { insuranceCustomFields: customInsuranceFields };
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: GOOGLE_CONFIG.CONFIG_RANGE,
+                    valueInputOption: 'RAW',
+                    resource: { values: [[JSON.stringify(config)]] }
+                });
+                console.log('✅ Custom field config saved');
+            } catch(e) {
+                console.warn('Could not save custom field config:', e);
+            }
+        }
+
+        function renderCustomFields(mode, savedValues) {
+            const grid = document.getElementById('customFieldsGrid_' + mode);
+            if (!grid) return;
+            if (customInsuranceFields.length === 0) {
+                grid.innerHTML = '<div class="form-field full-width" style="color:var(--text-muted);font-size:0.85rem;padding:4px 0;">No custom fields yet. Click + Add Field to create one.</div>';
+                return;
+            }
+            grid.innerHTML = customInsuranceFields.map(field => {
+                const id = mode + '_custom_' + field.key;
+                const savedVal = savedValues ? (savedValues[field.key] || '') : '';
+                let input = '';
+                if (field.type === 'toggle') {
+                    input = `<select class="form-select" id="${id}">
+                        <option value="">Select</option>
+                        <option value="Yes" ${savedVal === 'Yes' ? 'selected' : ''}>Yes</option>
+                        <option value="No" ${savedVal === 'No' ? 'selected' : ''}>No</option>
+                    </select>`;
+                } else if (field.type === 'select' && field.options) {
+                    const opts = field.options.map(o =>
+                        `<option value="${o}" ${savedVal === o ? 'selected' : ''}>${o}</option>`
+                    ).join('');
+                    input = `<select class="form-select" id="${id}"><option value="">Select</option>${opts}</select>`;
+                } else {
+                    input = `<input type="${field.type}" class="form-input" id="${id}" value="${savedVal}">`;
+                }
+                return `<div class="form-field custom-field-item">
+                    <label class="form-label">${field.label}</label>
+                    ${input}
+                </div>`;
+            }).join('');
+        }
+
+        function collectCustomFields(mode) {
+            const values = {};
+            customInsuranceFields.forEach(field => {
+                const el = document.getElementById(mode + '_custom_' + field.key);
+                if (el) values[field.key] = el.value || '';
+            });
+            return values;
+        }
+
+        function toggleAddFieldForm(mode) {
+            const form = document.getElementById('addFieldInline_' + mode);
+            if (!form) return;
+            form.classList.toggle('open');
+            if (form.classList.contains('open')) {
+                document.getElementById('newFieldLabel_' + mode).value = '';
+                document.getElementById('newFieldType_' + mode).value = 'text';
+                const optRow = document.getElementById('dropdownOptionsRow_' + mode);
+                if (optRow) optRow.style.display = 'none';
+            }
+        }
+
+        function toggleDropdownOptions(mode) {
+            const type = document.getElementById('newFieldType_' + mode).value;
+            const row = document.getElementById('dropdownOptionsRow_' + mode);
+            if (row) row.style.display = type === 'select' ? 'block' : 'none';
+        }
+
+        async function saveCustomField(mode) {
+            const label = document.getElementById('newFieldLabel_' + mode).value.trim();
+            if (!label) { alert('Please enter a field label.'); return; }
+            const type = document.getElementById('newFieldType_' + mode).value;
+            const key = label.toLowerCase().replace(/[^a-z0-9]+(.)/g, (m, c) => c.toUpperCase()).replace(/[^a-z0-9]/g, '');
+            if (customInsuranceFields.some(f => f.key === key)) {
+                alert('A field with a similar name already exists. Please use a different label.');
+                return;
+            }
+            const newField = { key, label, type };
+            if (type === 'select') {
+                const optInput = document.getElementById('newFieldOptions_' + mode)?.value || '';
+                newField.options = optInput.split(',').map(o => o.trim()).filter(Boolean);
+            }
+            customInsuranceFields.push(newField);
+            await saveCustomFieldConfig();
+            renderCustomFields('new');
+            renderCustomFields('edit');
+            toggleAddFieldForm(mode);
+            console.log('✅ Custom field added:', newField);
+        }
+
+        function openManageFieldsModal() {
+            if (customInsuranceFields.length === 0) {
+                alert('No custom fields defined yet. Use "+ Add Field" to create one.');
+                return;
+            }
+            const rowsHtml = customInsuranceFields.map((field, i) => `
+                <tr>
+                    <td style="padding:10px 12px;color:var(--text-primary);">${field.label}</td>
+                    <td style="padding:10px 12px;color:var(--text-muted);font-size:0.85rem;">${field.type}</td>
+                    <td style="padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text-muted);">${field.key}</td>
+                    <td style="padding:10px 12px;text-align:center;">
+                        <div style="display:flex;gap:6px;justify-content:center;">
+                            ${i > 0 ? `<button onclick="moveCustomField(${i},-1)" style="padding:3px 8px;background:var(--bg-elevated);border:1px solid var(--border-color);border-radius:4px;color:var(--text-secondary);cursor:pointer;">↑</button>` : '<span style="width:30px;"></span>'}
+                            ${i < customInsuranceFields.length-1 ? `<button onclick="moveCustomField(${i},1)" style="padding:3px 8px;background:var(--bg-elevated);border:1px solid var(--border-color);border-radius:4px;color:var(--text-secondary);cursor:pointer;">↓</button>` : '<span style="width:30px;"></span>'}
+                            <button onclick="deleteCustomField(${i})" style="padding:3px 8px;background:rgba(255,59,48,0.1);border:1px solid rgba(255,59,48,0.4);border-radius:4px;color:#ff3b30;cursor:pointer;">✕</button>
+                        </div>
+                    </td>
+                </tr>`).join('');
+            const modalHTML = `
+                <div id="manageFieldsModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;">
+                    <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:16px;padding:28px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                            <h3 style="font-size:1.3rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">⚙️ Manage Custom Insurance Fields</h3>
+                            <button onclick="closeManageFieldsModal()" style="padding:6px 14px;background:var(--bg-elevated);border:1px solid var(--border-color);border-radius:6px;color:var(--text-secondary);cursor:pointer;font-weight:600;">✕ Close</button>
+                        </div>
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="border-bottom:1px solid var(--border-color);">
+                                    <th style="text-align:left;padding:8px 12px;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Label</th>
+                                    <th style="text-align:left;padding:8px 12px;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Type</th>
+                                    <th style="text-align:left;padding:8px 12px;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Key</th>
+                                    <th style="text-align:center;padding:8px 12px;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="manageFieldsBody">${rowsHtml}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        }
+
+        function closeManageFieldsModal() {
+            const modal = document.getElementById('manageFieldsModal');
+            if (modal) modal.remove();
+        }
+
+        async function deleteCustomField(index) {
+            const field = customInsuranceFields[index];
+            if (!confirm('Delete custom field "' + field.label + '"?\n\nThis removes it from all future ROs. Existing saved data is not affected.')) return;
+            customInsuranceFields.splice(index, 1);
+            await saveCustomFieldConfig();
+            renderCustomFields('new');
+            renderCustomFields('edit');
+            closeManageFieldsModal();
+            if (customInsuranceFields.length > 0) openManageFieldsModal();
+        }
+
+        async function moveCustomField(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= customInsuranceFields.length) return;
+            const tmp = customInsuranceFields[index];
+            customInsuranceFields[index] = customInsuranceFields[newIndex];
+            customInsuranceFields[newIndex] = tmp;
+            await saveCustomFieldConfig();
+            renderCustomFields('new');
+            renderCustomFields('edit');
+            closeManageFieldsModal();
+            openManageFieldsModal();
+        }
+
         let currentROType = 'standard'; // 'standard' or 'insurance'
 
         function setROType(type, context) {
