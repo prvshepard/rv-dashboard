@@ -1897,7 +1897,7 @@
                 customerType: "Regular",
                 promisedDate: "2026-03-10",
                 roStatusNotes: "HVAC unit ordered, expected delivery 3/8. Roof patch materials in stock.",
-                customerCommunicationNotes: "Called customer 3/1 - OK with timeline. Will call again when parts arrive."
+                customerCommunicationNotes: "Called customer 3/1 - OK with timeline. Will call again when parts arrive.",
                 vin: ""
             },
             {
@@ -1918,7 +1918,7 @@
                 customerType: "VIP",
                 promisedDate: "2026-03-05",
                 roStatusNotes: "Main harness replaced. Testing all circuits before final inspection.",
-                customerCommunicationNotes: "VIP - text updates preferred. Sent progress photo 2/29."
+                customerCommunicationNotes: "VIP - text updates preferred. Sent progress photo 2/29.",
                 vin: ""
             },
             {
@@ -1939,7 +1939,7 @@
                 customerType: "Regular",
                 promisedDate: "2026-03-08",
                 roStatusNotes: "Engine rebuild 30% complete. Found additional wear on cam bearings - added to scope.",
-                customerCommunicationNotes: "Approved additional $800 for cam bearings via phone 2/28. Anxious about timeline."
+                customerCommunicationNotes: "Approved additional $800 for cam bearings via phone 2/28. Anxious about timeline.",
                 vin: ""
             },
             {
@@ -1960,7 +1960,7 @@
                 customerType: "Regular",
                 promisedDate: "2026-03-06",
                 roStatusNotes: "Slide-out mechanism fully repaired. Interior drying complete. Final QC in progress.",
-                customerCommunicationNotes: "Emailed photos of completed work 3/1. Customer very pleased with updates."
+                customerCommunicationNotes: "Emailed photos of completed work 3/1. Customer very pleased with updates.",
                 vin: ""
             },
             {
@@ -1981,7 +1981,7 @@
                 customerType: "VIP",
                 promisedDate: "2026-03-04",
                 roStatusNotes: "All maintenance complete. Generator serviced. Found minor oil leak - needs customer approval to fix.",
-                customerCommunicationNotes: "Left VM 3/1 about oil leak ($250 repair). Awaiting callback."
+                customerCommunicationNotes: "Left VM 3/1 about oil leak ($250 repair). Awaiting callback.",
                 vin: ""
             },
             {
@@ -2002,7 +2002,7 @@
                 customerType: "Regular",
                 promisedDate: "2026-03-12",
                 roStatusNotes: "Brake rotors on backorder - ETA 3/10. Suspension parts arrived, ready to install.",
-                customerCommunicationNotes: "Customer frustrated with delay. Offered discount on next service."
+                customerCommunicationNotes: "Customer frustrated with delay. Offered discount on next service.",
                 vin: ""
             },
             {
@@ -2023,7 +2023,7 @@
                 customerType: "Regular",
                 promisedDate: "2026-03-02",
                 roStatusNotes: "Installation complete. All systems tested and operational. Invoice ready.",
-                customerCommunicationNotes: "Texted customer 3/1 - picking up tomorrow morning at 9am."
+                customerCommunicationNotes: "Texted customer 3/1 - picking up tomorrow morning at 9am.",
                 vin: ""
             },
             {
@@ -2044,7 +2044,7 @@
                 customerType: "VIP",
                 promisedDate: "2026-03-07",
                 roStatusNotes: "Exterior detailing complete. Interior carpets cleaned. Leather conditioning underway.",
-                customerCommunicationNotes: "VIP - sends daily text asking for updates. Last contact 3/1 10am."
+                customerCommunicationNotes: "VIP - sends daily text asking for updates. Last contact 3/1 10am.",
                 vin: ""
             },
             {
@@ -2065,7 +2065,7 @@
                 customerType: "Regular",
                 promisedDate: "2026-03-06",
                 roStatusNotes: "Topper installed and sealed. Checking all mounting points and weatherproofing.",
-                customerCommunicationNotes: "Sent installation photos via email 2/29. Customer very responsive."
+                customerCommunicationNotes: "Sent installation photos via email 2/29. Customer very responsive.",
                 vin: ""
             }
         ];
@@ -5434,13 +5434,8 @@
         }
 
         // Load Google APIs
-        window.addEventListener('load', () => {
-            // Wait a bit for external scripts to be available
-            setTimeout(() => {
-                gapiLoaded();
-                gisLoaded();
-            }, 1000);
-        });
+        // gapiLoaded() is called via onload on the api.js script tag
+        // gisLoaded() is called via onload on the gsi/client script tag
 
         // Start the app when DOM is ready
         document.addEventListener('DOMContentLoaded', init);
@@ -5676,7 +5671,7 @@
         </div>
     </div>
 
-    <script src="https://accounts.google.com/gsi/client?v=2" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="https://apis.google.com/js/api.js?v=2" onload="gapiLoaded()"></script>
     <script>
