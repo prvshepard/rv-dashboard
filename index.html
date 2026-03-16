@@ -5840,7 +5840,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                 // Reset for new RO
                 editingROIndex = null;
                 const modalTitle = document.querySelector('#modalOverlay h2');
-                const submitBtn = document.querySelector('#newROForm button[type="submit"]');
+                const submitBtn = document.getElementById('newROSubmitBtn');
                 modalTitle.textContent = 'New Repair Order';
                 submitBtn.textContent = 'Save RO';
                 modalOverlay.classList.add('active');
@@ -6135,7 +6135,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Repair Order</button>
+                    <button type="submit" class="btn btn-primary" id="newROSubmitBtn">Save Repair Order</button>
                 </div>
             </form>
         </div>
