@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <!-- 
-    PRVS Dashboard v1.15
+    PRVS Dashboard v1.16
     Released: 2026-03-15
-    New in v1.15:
-    - VIN field added to all ROs — Column V in Sheet1, shown on card, editable in New RO and Edit RO forms
+    New in v1.16:
+    - Days on Lot filter — numeric input in filter row, shows ROs with days on lot >= entered value, X button to clear
 -->
 <html lang="en">
 <head>
@@ -1773,7 +1773,7 @@
                 <span id="totalRVs">0 RVs on Lot</span>
             </div>
             <div style="text-align: right; margin-top: 8px;">
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.15</span>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.16</span>
             </div>
         </header>
 
@@ -1828,6 +1828,28 @@
                         <button class="filter-btn" data-filter="Waiting for QA/QC" data-type="status">Waiting for QA/QC</button>
                         <button class="filter-btn" data-filter="Ready for pickup" data-type="status">Ready for Pickup</button>
                         <button class="filter-btn" data-filter="Delivered/Cashed Out" data-type="status">Delivered/Cashed Out</button>
+                    </div>
+                </div>
+
+                <div class="filter-section" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <label class="filter-label" style="margin-bottom: 0;">📅 Days on Lot ≥</label>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <input type="number" 
+                               id="daysOnLotFilter" 
+                               min="0" 
+                               step="1"
+                               placeholder="e.g. 7"
+                               style="width: 90px; padding: 8px 12px; background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'Barlow Condensed', sans-serif; font-size: 1rem; outline: none; transition: border-color 0.2s;"
+                               oninput="applyDaysFilter(this.value)"
+                               onfocus="this.style.borderColor='var(--accent-info)'"
+                               onblur="this.style.borderColor='var(--border-color)'">
+                        <button id="clearDaysFilter" 
+                                onclick="clearDaysFilter()"
+                                style="display: none; padding: 7px 12px; background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; transition: all 0.2s;"
+                                onmouseover="this.style.borderColor='var(--accent-urgent)'; this.style.color='var(--accent-urgent)'"
+                                onmouseout="this.style.borderColor='var(--border-color)'; this.style.color='var(--text-muted)'">
+                            ✕ Clear
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2075,6 +2097,7 @@
         let currentStatusFilters = []; // Changed to array for multi-select
         let currentRepairFilter = 'all';
         let currentSearchFilter = ''; // Customer name search
+        let currentDaysFilter = null; // Days on lot >= filter
         let timeLogsData = []; // Store time logs from Google Sheets
         let timeLogsRefreshInterval = null; // Auto-refresh timer
         
@@ -2945,9 +2968,32 @@
             }
         }
 
+        // Days on Lot filter functions
+        function applyDaysFilter(value) {
+            const num = parseInt(value);
+            const clearBtn = document.getElementById('clearDaysFilter');
+            if (!isNaN(num) && value !== '') {
+                currentDaysFilter = num;
+                if (clearBtn) clearBtn.style.display = 'inline-block';
+            } else {
+                currentDaysFilter = null;
+                if (clearBtn) clearBtn.style.display = 'none';
+            }
+            renderBoard();
+        }
+
+        function clearDaysFilter() {
+            currentDaysFilter = null;
+            const input = document.getElementById('daysOnLotFilter');
+            const clearBtn = document.getElementById('clearDaysFilter');
+            if (input) input.value = '';
+            if (clearBtn) clearBtn.style.display = 'none';
+            renderBoard();
+        }
+
         // Initialize
         function init() {
-            console.log('📦 PRVS Dashboard v1.15 - Released 2026-03-12');
+            console.log('📦 PRVS Dashboard v1.16 - Released 2026-03-12');
             loadSampleData();
             loadViewPreferences(); // Load tile view settings
             setupEventListeners();
@@ -3206,6 +3252,14 @@
                     // Handle multiple repair types (comma-separated)
                     const types = (ro.repairType || '').split(',').map(t => t.trim());
                     return types.includes(currentRepairFilter);
+                });
+            }
+
+            // Days on Lot filter
+            if (currentDaysFilter !== null && currentDaysFilter >= 0) {
+                filtered = filtered.filter(ro => {
+                    const days = calculateDaysOnLot(ro);
+                    return days !== null && days >= currentDaysFilter;
                 });
             }
 
