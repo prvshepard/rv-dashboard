@@ -3590,13 +3590,24 @@ If a field is not found, omit it entirely. Do not include null or empty string v
             </div>`;
         }
 
+        // Normalize extracted values — title case for name/address fields, uppercase for VIN
+        const TITLE_CASE_KEYS = ['customerName', 'rv', 'adjusterName', 'estimatedBy', 'repairFacility', 'insuranceCompany', 'carrier'];
+        function normalizeExtractedValue(key, value) {
+            if (key === 'vin') return value.toUpperCase();
+            if (TITLE_CASE_KEYS.includes(key)) {
+                return value.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+            }
+            return value;
+        }
+
         function applyChip(inputId, value, mode, key, chipEl) {
             const input = document.getElementById(inputId);
             if (input) {
+                const normalized = normalizeExtractedValue(key, value);
                 if (input.tagName === 'TEXTAREA') {
-                    input.value = value;
+                    input.value = normalized;
                 } else {
-                    input.value = key === 'vin' ? value.toUpperCase() : value;
+                    input.value = normalized;
                 }
             }
             if (chipEl) chipEl.remove();
@@ -3605,7 +3616,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
         function applyChipConflict(inputId, value, mode, key, conflictEl) {
             const input = document.getElementById(inputId);
             if (input) {
-                input.value = key === 'vin' ? value.toUpperCase() : value;
+                input.value = normalizeExtractedValue(key, value);
             }
             if (conflictEl) conflictEl.remove();
         }
