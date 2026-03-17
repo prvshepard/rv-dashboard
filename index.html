@@ -136,13 +136,16 @@
         
         .filters-row {
             display: flex;
-            gap: 20px;
+            gap: 24px;
             flex-wrap: wrap;
+            align-items: flex-start;
         }
 
         .filter-section {
-            flex: 1;
-            min-width: 300px;
+            min-width: 160px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
 
         .filter-label {
@@ -2273,7 +2276,7 @@
                     </div>
                 </div>
 
-                <div class="filter-section" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div class="filter-section">
                     <label class="filter-label">Outstanding Parts:</label>
                     <div class="filter-group">
                         <button class="filter-btn" id="partsFilterBtn" data-filter="all" data-type="parts" onclick="togglePartsFilter()">All ROs</button>
@@ -2282,7 +2285,7 @@
                     </div>
                 </div>
 
-                <div class="filter-section" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div class="filter-section">
                     <label class="filter-label">RO Type:</label>
                     <div class="filter-group">
                         <button class="filter-btn active" data-filter="all" data-type="rotype" onclick="toggleROTypeFilter('all')">All</button>
@@ -2292,8 +2295,8 @@
                     </div>
                 </div>
 
-                <div class="filter-section" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <label class="filter-label" style="margin-bottom: 0;">📅 Days on Lot ≥</label>
+                <div class="filter-section">
+                    <label class="filter-label">📅 Days on Lot ≥</label>
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <input type="number" 
                                id="daysOnLotFilter" 
