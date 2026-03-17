@@ -2283,6 +2283,16 @@
                 </div>
 
                 <div class="filter-section" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <label class="filter-label">RO Type:</label>
+                    <div class="filter-group">
+                        <button class="filter-btn active" data-filter="all" data-type="rotype" onclick="toggleROTypeFilter('all')">All</button>
+                        <button class="filter-btn" data-filter="insurance" data-type="rotype" onclick="toggleROTypeFilter('insurance')">🛡️ Insurance</button>
+                        <button class="filter-btn" data-filter="hybrid" data-type="rotype" onclick="toggleROTypeFilter('hybrid')">🔀 Hybrid</button>
+                        <button class="filter-btn" data-filter="standard" data-type="rotype" onclick="toggleROTypeFilter('standard')">🔧 Standard</button>
+                    </div>
+                </div>
+
+                <div class="filter-section" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                     <label class="filter-label" style="margin-bottom: 0;">📅 Days on Lot ≥</label>
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <input type="number" 
@@ -2550,6 +2560,7 @@
         let currentSearchFilter = ''; // Customer name search
         let currentDaysFilter = null; // Days on lot >= filter
         let currentPartsFilter = 'all'; // 'all', 'outstanding', 'backordered'
+        let currentROTypeFilter = 'all'; // 'all', 'insurance', 'hybrid', 'standard'
         let timeLogsData = []; // Store time logs from Google Sheets
         let timeLogsRefreshInterval = null; // Auto-refresh timer
         
@@ -4290,6 +4301,15 @@ If a field is not found, omit it entirely. Do not include null or empty string v
             'Lost':        '#ff3b30'
         };
 
+        // Toggle RO type filter
+        function toggleROTypeFilter(filter) {
+            currentROTypeFilter = filter || 'all';
+            document.querySelectorAll('[data-type="rotype"]').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === currentROTypeFilter);
+            });
+            renderBoard();
+        }
+
         // Toggle parts filter
         function togglePartsFilter(filter) {
             currentPartsFilter = filter || 'all';
@@ -5061,7 +5081,19 @@ If a field is not found, omit it entirely. Do not include null or empty string v
             
             // Multi-select status filter
             if (currentStatusFilters.length > 0) {
-                filtered = filtered.filter(ro => currentStatusFilters.includes(ro.status));
+                filtered = filtered.filter(ro => {
+                    // Standard status match
+                    if (currentStatusFilters.includes(ro.status)) return true;
+                    // "Awaiting parts" also matches any RO with outstanding parts
+                    // (ordered/in transit/backordered/lost) regardless of RO status
+                    if (currentStatusFilters.includes('Awaiting parts') && ro.partsJson) {
+                        try {
+                            const parts = JSON.parse(ro.partsJson);
+                            return parts.some(p => ['Ordered','In Transit','Backordered','Lost'].includes(p.status));
+                        } catch(e) {}
+                    }
+                    return false;
+                });
             }
             
             // Single-select repair filter
@@ -5078,6 +5110,23 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                 filtered = filtered.filter(ro => {
                     const days = calculateDaysOnLot(ro);
                     return days !== null && days >= currentDaysFilter;
+                });
+            }
+
+            // RO Type filter
+            if (currentROTypeFilter !== 'all') {
+                filtered = filtered.filter(ro => {
+                    let roType = 'standard';
+                    if (ro.insuranceData) {
+                        try {
+                            const d = JSON.parse(ro.insuranceData);
+                            if (d.isInsuranceClaim) roType = d.roType || 'insurance';
+                        } catch(e) {}
+                    }
+                    if (currentROTypeFilter === 'insurance') return roType === 'insurance';
+                    if (currentROTypeFilter === 'hybrid') return roType === 'hybrid';
+                    if (currentROTypeFilter === 'standard') return roType === 'standard';
+                    return true;
                 });
             }
 
@@ -5656,7 +5705,16 @@ If a field is not found, omit it entirely. Do not include null or empty string v
             const total = data.length;
             const filtered = filteredData ? filteredData.length : total;
             const inProgress = data.filter(ro => ro.status === 'In progress').length;
-            const awaitingParts = data.filter(ro => ro.status === 'Awaiting parts').length;
+            const awaitingParts = data.filter(ro => {
+                if (ro.status === 'Awaiting parts') return true;
+                if (ro.partsJson) {
+                    try {
+                        const parts = JSON.parse(ro.partsJson);
+                        return parts.some(p => ['Ordered','In Transit','Backordered','Lost'].includes(p.status));
+                    } catch(e) {}
+                }
+                return false;
+            }).length;
             // Exclude "Not On Lot" RVs (with no arrival date) from days-on-lot stats
             const onLotROs = data.filter(ro => !(ro.status === 'Not On Lot' && !ro.dateArrived));
             const avgDays = onLotROs.length > 0
