@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <!-- 
-    PRVS Dashboard v1.22
+    PRVS Dashboard v1.23
     Released: 2026-03-16
-    New in v1.22:
+    New in v1.23:
     - Insurance Claim Estimate Scanner — scan/upload estimate image or PDF in New RO and Edit RO modals, Claude vision extracts fields, inline suggestion chips for review and conflict resolution, file saved to Google Drive
 -->
 <html lang="en">
@@ -2190,6 +2190,51 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(255,149,0,0.3);
         }
+
+        /* ── Collapsible Filter Sections ── */
+        .filter-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+            padding: 4px 0;
+        }
+        .filter-toggle-label:hover .filter-chevron {
+            color: var(--accent-info);
+        }
+        .filter-chevron {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            transition: transform 0.2s ease;
+            display: inline-block;
+        }
+        .filter-chevron.open {
+            transform: rotate(180deg);
+        }
+        .filter-active-indicator {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent-info);
+            margin-left: 2px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .filter-active-indicator.visible {
+            opacity: 1;
+        }
+        .filter-collapsible {
+            overflow: hidden;
+            transition: max-height 0.25s ease, opacity 0.2s ease;
+            max-height: 0;
+            opacity: 0;
+        }
+        .filter-collapsible.open {
+            max-height: 300px;
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -2218,7 +2263,7 @@
                 <span id="totalRVs">0 RVs on Lot</span>
             </div>
             <div style="text-align: right; margin-top: 8px;">
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.22</span>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.23</span>
             </div>
         </header>
 
@@ -2261,37 +2306,55 @@
                 </div>
 
                 <div class="filter-section">
-                    <label class="filter-label">Filter by Status:</label>
-                    <div class="filter-group">
-                        <button class="filter-btn active" data-filter="all" data-type="status">All</button>
-                        <button class="filter-btn" data-filter="Not On Lot" data-type="status">Not On Lot</button>
-                        <button class="filter-btn" data-filter="On Lot" data-type="status">On Lot</button>
-                        <button class="filter-btn" data-filter="Awaiting Approval" data-type="status">Awaiting Approval</button>
-                        <button class="filter-btn" data-filter="Awaiting parts" data-type="status">Awaiting Parts</button>
-                        <button class="filter-btn" data-filter="In progress" data-type="status">In Progress</button>
-                        <button class="filter-btn" data-filter="Repairs Completed" data-type="status">Repairs Completed</button>
-                        <button class="filter-btn" data-filter="Waiting for QA/QC" data-type="status">Waiting for QA/QC</button>
-                        <button class="filter-btn" data-filter="Ready for pickup" data-type="status">Ready for Pickup</button>
-                        <button class="filter-btn" data-filter="Delivered/Cashed Out" data-type="status">Delivered/Cashed Out</button>
+                    <label class="filter-label filter-toggle-label" onclick="toggleFilterSection('status')">
+                        Filter by Status
+                        <span class="filter-active-indicator" id="status-active-dot"></span>
+                        <span class="filter-chevron" id="status-chevron">▼</span>
+                    </label>
+                    <div class="filter-collapsible" id="status-collapsible">
+                        <div class="filter-group" style="padding-top:8px;">
+                            <button class="filter-btn active" data-filter="all" data-type="status">All</button>
+                            <button class="filter-btn" data-filter="Not On Lot" data-type="status">Not On Lot</button>
+                            <button class="filter-btn" data-filter="On Lot" data-type="status">On Lot</button>
+                            <button class="filter-btn" data-filter="Awaiting Approval" data-type="status">Awaiting Approval</button>
+                            <button class="filter-btn" data-filter="Awaiting parts" data-type="status">Awaiting Parts</button>
+                            <button class="filter-btn" data-filter="In progress" data-type="status">In Progress</button>
+                            <button class="filter-btn" data-filter="Repairs Completed" data-type="status">Repairs Completed</button>
+                            <button class="filter-btn" data-filter="Waiting for QA/QC" data-type="status">Waiting for QA/QC</button>
+                            <button class="filter-btn" data-filter="Ready for pickup" data-type="status">Ready for Pickup</button>
+                            <button class="filter-btn" data-filter="Delivered/Cashed Out" data-type="status">Delivered/Cashed Out</button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="filter-section">
-                    <label class="filter-label">Outstanding Parts:</label>
-                    <div class="filter-group">
-                        <button class="filter-btn" id="partsFilterBtn" data-filter="all" data-type="parts" onclick="togglePartsFilter()">All ROs</button>
-                        <button class="filter-btn" data-filter="outstanding" data-type="parts" onclick="togglePartsFilter('outstanding')">⚠️ Outstanding</button>
-                        <button class="filter-btn" data-filter="backordered" data-type="parts" onclick="togglePartsFilter('backordered')">🔴 Backordered</button>
+                    <label class="filter-label filter-toggle-label" onclick="toggleFilterSection('parts')">
+                        Filter by Parts Status
+                        <span class="filter-active-indicator" id="parts-active-dot"></span>
+                        <span class="filter-chevron" id="parts-chevron">▼</span>
+                    </label>
+                    <div class="filter-collapsible" id="parts-collapsible">
+                        <div class="filter-group" style="padding-top:8px;">
+                            <button class="filter-btn active" id="partsFilterBtn" data-filter="all" data-type="parts" onclick="togglePartsFilter()">All ROs</button>
+                            <button class="filter-btn" data-filter="outstanding" data-type="parts" onclick="togglePartsFilter('outstanding')">⚠️ Outstanding</button>
+                            <button class="filter-btn" data-filter="backordered" data-type="parts" onclick="togglePartsFilter('backordered')">🔴 Backordered</button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="filter-section">
-                    <label class="filter-label">RO Type:</label>
-                    <div class="filter-group">
-                        <button class="filter-btn active" data-filter="all" data-type="rotype" onclick="toggleROTypeFilter('all')">All</button>
-                        <button class="filter-btn" data-filter="insurance" data-type="rotype" onclick="toggleROTypeFilter('insurance')">🛡️ Insurance</button>
-                        <button class="filter-btn" data-filter="hybrid" data-type="rotype" onclick="toggleROTypeFilter('hybrid')">🔀 Hybrid</button>
-                        <button class="filter-btn" data-filter="standard" data-type="rotype" onclick="toggleROTypeFilter('standard')">🔧 Standard</button>
+                    <label class="filter-label filter-toggle-label" onclick="toggleFilterSection('insurance')">
+                        Filter by Insurance
+                        <span class="filter-active-indicator" id="insurance-active-dot"></span>
+                        <span class="filter-chevron" id="insurance-chevron">▼</span>
+                    </label>
+                    <div class="filter-collapsible" id="insurance-collapsible">
+                        <div class="filter-group" style="padding-top:8px;">
+                            <button class="filter-btn active" data-filter="all" data-type="rotype" onclick="toggleROTypeFilter('all')">All</button>
+                            <button class="filter-btn" data-filter="insurance" data-type="rotype" onclick="toggleROTypeFilter('insurance')">🛡️ Insurance</button>
+                            <button class="filter-btn" data-filter="hybrid" data-type="rotype" onclick="toggleROTypeFilter('hybrid')">🔀 Hybrid</button>
+                            <button class="filter-btn" data-filter="standard" data-type="rotype" onclick="toggleROTypeFilter('standard')">🔧 Standard</button>
+                        </div>
                     </div>
                 </div>
 
@@ -4304,6 +4367,53 @@ If a field is not found, omit it entirely. Do not include null or empty string v
             'Lost':        '#ff3b30'
         };
 
+
+        // ── Collapsible Filter Sections ──────────────────────────────
+
+        const FILTER_SECTIONS = ['status', 'parts', 'insurance'];
+
+        function toggleFilterSection(section) {
+            const collapsible = document.getElementById(section + '-collapsible');
+            const chevron = document.getElementById(section + '-chevron');
+            if (!collapsible) return;
+
+            const isOpen = collapsible.classList.contains('open');
+            collapsible.classList.toggle('open', !isOpen);
+            if (chevron) chevron.classList.toggle('open', !isOpen);
+
+            // Save state to localStorage
+            try {
+                const states = JSON.parse(localStorage.getItem('filterSectionStates') || '{}');
+                states[section] = !isOpen;
+                localStorage.setItem('filterSectionStates', JSON.stringify(states));
+            } catch(e) {}
+        }
+
+        function restoreFilterSectionStates() {
+            try {
+                const states = JSON.parse(localStorage.getItem('filterSectionStates') || '{}');
+                FILTER_SECTIONS.forEach(section => {
+                    const isOpen = states[section] === true;
+                    const collapsible = document.getElementById(section + '-collapsible');
+                    const chevron = document.getElementById(section + '-chevron');
+                    if (collapsible) collapsible.classList.toggle('open', isOpen);
+                    if (chevron) chevron.classList.toggle('open', isOpen);
+                });
+            } catch(e) {}
+        }
+
+        function updateFilterActiveDots() {
+            // Status dot
+            const statusActive = document.querySelector('[data-type="status"].active:not([data-filter="all"])');
+            document.getElementById('status-active-dot')?.classList.toggle('visible', !!statusActive);
+            // Parts dot
+            const partsActive = currentPartsFilter !== 'all';
+            document.getElementById('parts-active-dot')?.classList.toggle('visible', partsActive);
+            // Insurance dot
+            const insuranceActive = currentROTypeFilter !== 'all';
+            document.getElementById('insurance-active-dot')?.classList.toggle('visible', insuranceActive);
+        }
+
         // Toggle RO type filter
         function toggleROTypeFilter(filter) {
             currentROTypeFilter = filter || 'all';
@@ -4805,7 +4915,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
 
         // Initialize
         function init() {
-            console.log('📦 PRVS Dashboard v1.22 - Released 2026-03-12');
+            console.log('📦 PRVS Dashboard v1.23 - Released 2026-03-12');
 
             // Auto-fill saved Anthropic API key into both scan inputs
             const savedAnthropicKey = localStorage.getItem('prvs_anthropic_key');
@@ -4820,6 +4930,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
 
             loadSampleData();
             loadViewPreferences(); // Load tile view settings
+            setTimeout(restoreFilterSectionStates, 100);
             setupEventListeners();
             setupModalListeners();
             updateClock();
@@ -5152,6 +5263,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
 
             // Store filtered data globally for functions to access
             currentFilteredData = filtered;
+            setTimeout(updateFilterActiveDots, 50);
             
             // Update stats with both sorted (all data) and filtered data
             updateStats(sorted, filtered);
