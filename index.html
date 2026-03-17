@@ -2291,7 +2291,8 @@
                 <button id="clearSearch" class="clear-search-btn" style="display: none;">✕ Clear</button>
             </div>
 
-            <div class="filters-row">
+            <!-- Row 1: Days on Lot | Parts Status | Insurance -->
+            <div class="filters-row" style="margin-bottom: 16px;">
                 <div class="filter-section">
                     <label class="filter-label">📅 Filter by Days on Lot ≥</label>
                     <div style="display: flex; align-items: center; gap: 6px;">
@@ -2314,6 +2315,40 @@
                     </div>
                 </div>
 
+                <div class="filter-section">
+                    <label class="filter-label filter-toggle-label" onclick="toggleFilterSection('parts')">
+                        Filter by Parts Status
+                        <span class="filter-active-indicator" id="parts-active-dot"></span>
+                        <span class="filter-chevron" id="parts-chevron">▼</span>
+                    </label>
+                    <div class="filter-collapsible" id="parts-collapsible">
+                        <div class="filter-group" style="padding-top:8px;">
+                            <button class="filter-btn active" id="partsFilterBtn" data-filter="all" data-type="parts" onclick="togglePartsFilter()">All ROs</button>
+                            <button class="filter-btn" data-filter="outstanding" data-type="parts" onclick="togglePartsFilter('outstanding')">⚠️ Outstanding</button>
+                            <button class="filter-btn" data-filter="backordered" data-type="parts" onclick="togglePartsFilter('backordered')">🔴 Backordered</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-section">
+                    <label class="filter-label filter-toggle-label" onclick="toggleFilterSection('insurance')">
+                        Filter by Insurance
+                        <span class="filter-active-indicator" id="insurance-active-dot"></span>
+                        <span class="filter-chevron" id="insurance-chevron">▼</span>
+                    </label>
+                    <div class="filter-collapsible" id="insurance-collapsible">
+                        <div class="filter-group" style="padding-top:8px;">
+                            <button class="filter-btn active" data-filter="all" data-type="rotype" onclick="toggleROTypeFilter('all')">All</button>
+                            <button class="filter-btn" data-filter="insurance" data-type="rotype" onclick="toggleROTypeFilter('insurance')">🛡️ Insurance</button>
+                            <button class="filter-btn" data-filter="hybrid" data-type="rotype" onclick="toggleROTypeFilter('hybrid')">🔀 Hybrid</button>
+                            <button class="filter-btn" data-filter="standard" data-type="rotype" onclick="toggleROTypeFilter('standard')">🔧 Standard</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Repair Type | Status -->
+            <div class="filters-row">
                 <div class="filter-section">
                     <label class="filter-label">Filter by Repair Type:</label>
                     <div class="filter-group">
@@ -2350,39 +2385,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="filter-section">
-                    <label class="filter-label filter-toggle-label" onclick="toggleFilterSection('parts')">
-                        Filter by Parts Status
-                        <span class="filter-active-indicator" id="parts-active-dot"></span>
-                        <span class="filter-chevron" id="parts-chevron">▼</span>
-                    </label>
-                    <div class="filter-collapsible" id="parts-collapsible">
-                        <div class="filter-group" style="padding-top:8px;">
-                            <button class="filter-btn active" id="partsFilterBtn" data-filter="all" data-type="parts" onclick="togglePartsFilter()">All ROs</button>
-                            <button class="filter-btn" data-filter="outstanding" data-type="parts" onclick="togglePartsFilter('outstanding')">⚠️ Outstanding</button>
-                            <button class="filter-btn" data-filter="backordered" data-type="parts" onclick="togglePartsFilter('backordered')">🔴 Backordered</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="filter-section">
-                    <label class="filter-label filter-toggle-label" onclick="toggleFilterSection('insurance')">
-                        Filter by Insurance
-                        <span class="filter-active-indicator" id="insurance-active-dot"></span>
-                        <span class="filter-chevron" id="insurance-chevron">▼</span>
-                    </label>
-                    <div class="filter-collapsible" id="insurance-collapsible">
-                        <div class="filter-group" style="padding-top:8px;">
-                            <button class="filter-btn active" data-filter="all" data-type="rotype" onclick="toggleROTypeFilter('all')">All</button>
-                            <button class="filter-btn" data-filter="insurance" data-type="rotype" onclick="toggleROTypeFilter('insurance')">🛡️ Insurance</button>
-                            <button class="filter-btn" data-filter="hybrid" data-type="rotype" onclick="toggleROTypeFilter('hybrid')">🔀 Hybrid</button>
-                            <button class="filter-btn" data-filter="standard" data-type="rotype" onclick="toggleROTypeFilter('standard')">🔧 Standard</button>
-                        </div>
-                    </div>
-                </div>
-
-
             </div>
         </div>
 
