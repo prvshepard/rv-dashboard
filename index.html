@@ -5440,8 +5440,8 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                         </button>
                         
                         ${shouldShow('photoUpload') ? `
-                        <button class="photo-upload-btn" onclick="${ro.rvPhotoUrl ? `openPhotoLibrary(${index})` : `uploadPhoto(${index})`}" title="${ro.rvPhotoUrl ? 'Manage Photos & Docs' : 'Add Photo'}">
-                            📷 ${ro.rvPhotoUrl ? 'Manage Photos & Docs' : 'Add Photo'}
+                        <button class="photo-upload-btn" onclick="openPhotoLibrary(${index})" title="Manage Photos & Docs">
+                            📷 ${ro.rvPhotoUrl ? 'Manage Photos & Docs' : 'Add Photo / Docs'}
                         </button>
                         ` : ''}
                         
