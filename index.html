@@ -4563,7 +4563,24 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                             </div>
                         </div>
 
-                        <button onclick="showAddPartForm()" style="width:100%;margin-top:16px;
+                        <!-- Parts Table -->
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;font-size:0.9rem;" id="partsTable">
+                                <thead>
+                                    <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                                        <th style="text-align:left;padding:10px 8px;color:#475569;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;">Part Name</th>
+                                        <th style="text-align:left;padding:10px 8px;color:#475569;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;">Part #</th>
+                                        <th style="text-align:left;padding:10px 8px;color:#475569;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;">Supplier</th>
+                                        <th style="text-align:center;padding:10px 8px;color:#475569;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;">Status</th>
+                                        <th style="text-align:center;padding:10px 8px;color:#475569;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;">Qty</th>
+                                        <th style="text-align:center;padding:10px 8px;color:#475569;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;">Quick</th>
+                                        <th style="text-align:center;padding:10px 8px;color:#475569;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="partsTableBody">${renderPartsRows(parts)}</tbody>
+                            </table>
+                        </div>
+                        <button onclick="showAddPartForm()" style="width:100%;margin-top:16px;padding:12px;background:linear-gradient(135deg,#ff9500,#e67e00);color:white;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">+ Add Part</button>
                     </div>
                 </div>`;
 
