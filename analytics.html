@@ -13,6 +13,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PRVS Analytics</title>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
@@ -427,11 +428,9 @@
 <div id="loginGate">
     <div class="login-box">
         <h2>📊 PRVS Analytics</h2>
-        <p>Admin access required</p>
-        <input type="password" id="adminPassInput" placeholder="Enter admin password" 
-               onkeydown="if(event.key==='Enter') checkPassword()">
-        <button class="login-btn" onclick="checkPassword()">Unlock</button>
-        <div class="login-error" id="loginError">Incorrect password. Try again.</div>
+        <p>Admin access required. Sign in with your Patriots RV Google account.</p>
+        <div id="googleSignInBtn" style="display:flex;justify-content:center;margin:20px 0;"></div>
+        <div class="login-error" id="loginError" style="display:none;">Access denied — admin account required.</div>
     </div>
 </div>
 
@@ -444,7 +443,7 @@
         </div>
         <div class="top-bar-right">
             <span id="statusBar" class="status-bar"></span>
-            <button class="refresh-btn" id="refreshBtn" onclick="connectAndLoad()">🔗 Connect to Sheets</button>
+            <button class="refresh-btn" id="refreshBtn" onclick="loadCashieredData()">🔄 Refresh Data</button>
             <a href="index.html" class="back-btn">← Dashboard</a>
         </div>
     </div>
@@ -460,8 +459,7 @@
 
         <!-- Connect Prompt (shown before connecting) -->
         <div class="connect-prompt" id="connectPrompt">
-            <p>Connect to Google Sheets to load analytics from the <strong>Cashiered</strong> tab.</p>
-            <button class="connect-sheets-btn" onclick="connectAndLoad()">🔗 Connect to Google Sheets</button>
+            <p>Loading analytics data from Supabase...</p>
         </div>
 
         <!-- KPI Cards -->
@@ -528,7 +526,7 @@
                         </tr>
                     </thead>
                     <tbody id="repairTypeBody">
-                        <tr><td colspan="4" class="loading-state">Connect to Sheets to load data</td></tr>
+                        <tr><td colspan="4" class="loading-state">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -544,7 +542,7 @@
                         </tr>
                     </thead>
                     <tbody id="techBody">
-                        <tr><td colspan="4" class="loading-state">Connect to Sheets to load data</td></tr>
+                        <tr><td colspan="4" class="loading-state">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -552,142 +550,141 @@
     </div>
 </div>
 
-<!-- Google API Scripts -->
-<script src="https://apis.google.com/js/api.js"></script>
-<script src="https://accounts.google.com/gsi/client"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <script>
     // ── CONFIG ──
-    const ADMIN_PASSWORD = 'prvs2024admin';
+    const SUPABASE_URL  = 'https://axfejhudchdejoiwaetq.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4ZmVqaHVkY2hkZWpvaXdhZXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3OTE2NzEsImV4cCI6MjA4OTM2NzY3MX0.CF7XxtXOHg6Zpsb31m55YsMVd2QHSE5L3t7_FtMFfxY';
+    const GOOGLE_CLIENT_ID = '971946834908-fqhmdrie6ntt0mmmbh4rkpaop8edvgr8.apps.googleusercontent.com';
+    const ADMIN_EMAILS = ['roland@patriotsrvservices.com'];
 
-    const GOOGLE_CONFIG = {
-        CLIENT_ID: '971946834908-fqhmdrie6ntt0mmmbh4rkpaop8edvgr8.apps.googleusercontent.com',
-        API_KEY: 'AIzaSyB6kg5hZiXJxUoGtKSXIxKj7JfOGNN6jbc',
-        SPREADSHEET_ID: '1Nkf_BoqDhanJRCyeqIerF-Te_Z_R0h3mZelcgTjS62Y',
-        CASHIERED_RANGE: 'Cashiered!A:U',
-        DISCOVERY_DOCS: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
-        SCOPES: 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/userinfo.email'
-    };
+    let _sb = null;
+    function getSB() {
+        if (!_sb) _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+        return _sb;
+    }
 
-    let gapiInited = false;
-    let gisInited = false;
-    let tokenClient;
+    let currentUser = null;
     let cashieredData = [];
-    let currentPeriod = 'week';
+    let currentPeriod = 'month';
     let revenueChartInstance = null;
     let repairTypeChartInstance = null;
     let techChartInstance = null;
 
-    // ── PASSWORD GATE ──
-    function checkPassword() {
-        const input = document.getElementById('adminPassInput').value;
-        if (input === ADMIN_PASSWORD) {
-            document.getElementById('loginGate').style.display = 'none';
-            document.getElementById('app').style.display = 'block';
-            initGapi();
-        } else {
-            const err = document.getElementById('loginError');
-            err.style.display = 'block';
-            document.getElementById('adminPassInput').value = '';
-            setTimeout(() => { err.style.display = 'none'; }, 3000);
-        }
-    }
-
-    // ── GOOGLE API INIT ──
-    function initGapi() {
-        gapi.load('client', async () => {
-            await gapi.client.init({
-                apiKey: GOOGLE_CONFIG.API_KEY,
-                discoveryDocs: GOOGLE_CONFIG.DISCOVERY_DOCS,
-            });
-            gapiInited = true;
-            maybeInitTokenClient();
-        });
-    }
-
-    function gisLoaded() {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: GOOGLE_CONFIG.CLIENT_ID,
-            scope: GOOGLE_CONFIG.SCOPES,
-            callback: async (resp) => {
-                if (resp.error) { console.error(resp); return; }
-                gapi.client.setToken({ access_token: resp.access_token });
-                await loadCashieredData();
-            },
-        });
-        gisInited = true;
-        maybeInitTokenClient();
-    }
-
-    function maybeInitTokenClient() {
-        // Auto-connect once both libs are ready (only if app is visible)
-        if (gapiInited && gisInited && document.getElementById('app').style.display !== 'none') {
-            // Don't auto-prompt — wait for user click
-        }
-    }
-
-    async function connectAndLoad() {
-        const btn = document.getElementById('refreshBtn');
-        btn.disabled = true;
-        btn.textContent = '⏳ Connecting...';
-
-        if (!gapiInited || !gisInited) {
-            setStatus('⏳ Waiting for Google libraries...');
-            // Retry after libraries load
-            const wait = setInterval(() => {
-                if (gapiInited && gisInited) {
-                    clearInterval(wait);
-                    tokenClient.requestAccessToken({ prompt: '' });
+    // ── INIT ──
+    document.addEventListener('DOMContentLoaded', () => {
+        // Check stored identity first
+        const stored = localStorage.getItem('prvs_user_identity');
+        if (stored) {
+            try {
+                const identity = JSON.parse(stored);
+                const daysSince = (Date.now() - (identity.savedAt || 0)) / 86400000;
+                if (daysSince < 30 && identity.email) {
+                    currentUser = { email: identity.email, name: identity.name };
+                    if (ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) {
+                        showApp();
+                        return;
+                    } else {
+                        showAccessDenied();
+                        return;
+                    }
                 }
-            }, 300);
-            return;
+            } catch(e) {}
         }
-        tokenClient.requestAccessToken({ prompt: '' });
+        // No stored identity — show Google sign-in
+        initGoogleSignIn();
+    });
+
+    function initGoogleSignIn() {
+        const tryInit = setInterval(() => {
+            if (typeof google !== 'undefined' && google.accounts) {
+                clearInterval(tryInit);
+                google.accounts.id.initialize({
+                    client_id: GOOGLE_CLIENT_ID,
+                    callback: handleSignIn,
+                    auto_select: true,
+                });
+                google.accounts.id.renderButton(
+                    document.getElementById('googleSignInBtn'),
+                    { theme: 'outline', size: 'large', width: 280 }
+                );
+                google.accounts.id.prompt();
+            }
+        }, 200);
+    }
+
+    function handleSignIn(response) {
+        try {
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            currentUser = { email: payload.email, name: payload.name };
+            // Save identity
+            localStorage.setItem('prvs_user_identity', JSON.stringify({
+                email: currentUser.email, name: currentUser.name, savedAt: Date.now()
+            }));
+            if (ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) {
+                showApp();
+            } else {
+                showAccessDenied();
+            }
+        } catch(e) {
+            console.error('Sign-in error:', e);
+        }
+    }
+
+    function showAccessDenied() {
+        const err = document.getElementById('loginError');
+        err.style.display = 'block';
+        err.textContent = `Access denied — ${currentUser?.email} is not an admin account.`;
+    }
+
+    function showApp() {
+        document.getElementById('loginGate').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        // Set default period tab to month
+        document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+        document.querySelector('.period-tab:nth-child(2)').classList.add('active');
+        loadCashieredData();
     }
 
     async function loadCashieredData() {
-        setStatus('⏳ Loading Cashiered data...');
+        setStatus('⏳ Loading analytics data...');
         const btn = document.getElementById('refreshBtn');
+        btn.disabled = true;
         try {
-            const response = await gapi.client.sheets.spreadsheets.values.get({
-                spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
-                range: GOOGLE_CONFIG.CASHIERED_RANGE,
-            });
-            const rows = response.result.values || [];
-            // Skip header row (row 0)
-            cashieredData = rows.slice(1).map(r => ({
-                customerName:   r[0]  || '',
-                phone:          r[1]  || '',
-                email:          r[2]  || '',
-                address:        r[3]  || '',
-                rv:             r[4]  || '',
-                photoUrl:       r[5]  || '',
-                repairType:     r[6]  || '',
-                description:    r[7]  || '',
-                tech:           r[8]  || '',
-                dateReceived:   r[9]  || '',
-                pctComplete:    r[10] || '',
-                dollarValue:    parseFloat(r[11]) || 0,
-                status:         r[12] || '',
-                urgency:        r[13] || '',
-                customerType:   r[14] || '',
-                promisedDate:   r[15] || '',
-                roNotes:        r[16] || '',
-                commNotes:      r[17] || '',
-                dateArrived:    r[18] || '',
-                photoLibrary:   r[19] || '',
-                roId:           r[20] || '',
+            const { data: rows, error } = await getSB()
+                .from('cashiered')
+                .select('*')
+                .order('archived_at', { ascending: false });
+
+            if (error) throw error;
+
+            cashieredData = (rows || []).map(r => ({
+                customerName:   r.customer_name  || '',
+                rv:             r.rv             || '',
+                repairType:     r.repair_type    || '',
+                description:    r.description    || '',
+                tech:           r.technician     || '',
+                dateReceived:   r.date_received  || '',
+                dateArrived:    r.date_arrived   || '',
+                dateClosed:     r.date_closed    || r.archived_at || '',
+                archivedAt:     r.archived_at    || '',
+                dollarValue:    parseFloat(r.dollar_value) || 0,
+                daysOnLot:      r.days_on_lot    || 0,
+                status:         r.status         || '',
+                customerType:   r.customer_type  || '',
+                roId:           r.ro_id          || '',
+                weekLabel:      r.week_label     || '',
             }));
 
             setStatus(`✅ ${cashieredData.length} archived ROs loaded`);
             document.getElementById('connectPrompt').style.display = 'none';
-            btn.textContent = '🔄 Refresh Data';
+            btn.textContent = '🔄 Refresh';
             btn.disabled = false;
             renderAll();
         } catch (err) {
-            console.error('Error loading Cashiered data:', err);
-            setStatus('❌ Error loading data — check console');
-            btn.textContent = '🔗 Connect to Sheets';
+            console.error('Error loading cashiered data:', err);
+            setStatus('❌ Error loading data: ' + err.message);
             btn.disabled = false;
         }
     }
@@ -703,8 +700,8 @@
     function getFilteredData() {
         const now = new Date();
         return cashieredData.filter(ro => {
-            // Use dateReceived as the archive date proxy (closest we have)
-            const d = new Date(ro.dateReceived);
+            // Use archivedAt (when actually cashed out) for filtering
+            const d = new Date(ro.archivedAt || ro.dateClosed || ro.dateReceived);
             if (isNaN(d)) return currentPeriod === 'all';
             if (currentPeriod === 'all') return true;
             if (currentPeriod === 'year') {
@@ -725,12 +722,12 @@
 
     // ── CALCULATE DAYS ON LOT ──
     function calcDaysOnLot(ro) {
-        const arrived = ro.dateArrived ? new Date(ro.dateArrived) : new Date(ro.dateReceived);
-        const received = new Date(ro.dateReceived);
-        const start = !isNaN(arrived) ? arrived : received;
+        // Use stored days_on_lot from Supabase (computed at archive time)
+        if (ro.daysOnLot > 0) return ro.daysOnLot;
+        // Fallback calculation
+        const start = ro.dateArrived ? new Date(ro.dateArrived) : new Date(ro.dateReceived);
+        const end = ro.dateClosed ? new Date(ro.dateClosed) : new Date();
         if (isNaN(start)) return null;
-        // For archived ROs we use today as the end date if no "cashed out" date column exists
-        const end = new Date();
         return Math.max(0, Math.floor((end - start) / (1000 * 60 * 60 * 24)));
     }
 
@@ -955,7 +952,6 @@
     }
 </script>
 
-<!-- Load GIS after body so gisLoaded fires correctly -->
-<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+
 </body>
 </html>
