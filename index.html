@@ -6009,7 +6009,10 @@ If a field is not found, omit it entirely. Do not include null or empty string v
         let userRoles = []; // array of role names e.g. ['Admin', 'Manager']
 
         function isAdmin() {
-            return userRoles.includes('Admin');
+            // Check roles array first, then fall back to email check
+            if (userRoles.includes('Admin')) return true;
+            if (currentUser && ADMIN_EMAILS.includes(currentUser.email?.toLowerCase())) return true;
+            return false;
         }
         function hasRole(role) {
             return userRoles.includes(role);
