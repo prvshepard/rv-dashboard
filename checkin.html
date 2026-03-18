@@ -311,6 +311,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await openIDB();
+
+    // ── Check for stored identity first (30-day persistence) ──
+    const storedIdentity = localStorage.getItem('prvs_user_identity') 
+                        || localStorage.getItem('prvs_checkin_user');
+    if (storedIdentity) {
+        try {
+            const stored = JSON.parse(storedIdentity);
+            const savedAt = stored.savedAt || Date.now();
+            const daysSince = (Date.now() - savedAt) / 86400000;
+            if (daysSince < 30 && stored.email) {
+                currentUser = { email: stored.email, name: stored.name };
+                console.log('✅ Auto sign-in from stored identity:', currentUser.name);
+                await loadAndRender();
+                return;
+            }
+        } catch(e) { console.warn('Identity parse error:', e); }
+    }
+
+    // No stored identity — show sign-in
     showSignIn();
 });
 
@@ -347,7 +366,9 @@ async function handleSignIn(response) {
         currentUser = { email: payload.email, name: payload.name, id: payload.sub };
         console.log('✅ Signed in as:', currentUser.name);
 
-        // Store for offline use
+        // Store identity with timestamp for 30-day persistence
+        const identityRecord = { email: currentUser.email, name: currentUser.name, savedAt: Date.now() };
+        localStorage.setItem('prvs_user_identity', JSON.stringify(identityRecord));
         localStorage.setItem('prvs_checkin_user', JSON.stringify(currentUser));
 
         await loadAndRender();
@@ -561,10 +582,13 @@ function render() {
 
     const isClockedIn = !!activeSession;
 
-    // Pre-select service types from RO repair_type
-    if (!selectedServices.length && roData.repair_type) {
-        selectedServices = roData.repair_type.split(',').map(s => s.trim()).filter(s => SERVICE_TYPES.includes(s));
-    }
+    // Only show service types on this RO, auto-select if just one
+        const roServiceTypes = roData.repair_type
+            ? roData.repair_type.split(',').map(s => s.trim()).filter(s => ALL_SERVICE_TYPES.includes(s))
+            : ALL_SERVICE_TYPES;
+        if (!selectedService && roServiceTypes.length === 1) {
+            selectedService = roServiceTypes[0];
+        }
 
     document.getElementById('app').innerHTML = `
         <div id="syncBanner" class="sync-banner" style="display:none;"></div>
@@ -646,6 +670,8 @@ function render() {
 
         <div style="text-align:center;margin-top:16px;font-size:12px;color:#94a3b8;">
             Signed in as ${currentUser?.name || 'Unknown'} (${currentUser?.email || ''})
+            &nbsp;·&nbsp;
+            <span onclick="signOut()" style="color:#3b82f6;cursor:pointer;text-decoration:underline;">Switch account</span>
         </div>
     `;
 
@@ -861,6 +887,17 @@ function toggleDictation() {
     };
 
     recognition.start();
+}
+
+
+// ── Sign Out ──────────────────────────────────────────────────
+function signOut() {
+    localStorage.removeItem('prvs_user_identity');
+    localStorage.removeItem('prvs_checkin_user');
+    currentUser = null;
+    activeSession = null;
+    if (typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
+    showSignIn();
 }
 
 // ── Helpers ───────────────────────────────────────────────────

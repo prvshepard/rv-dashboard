@@ -2729,7 +2729,7 @@
                 daysOnLot: true,
                 qrCode: false,
                 printLabel: false,
-                photoUpload: false,
+                photoUpload: true,
                 urgencySelector: true,
                 statusDropdown: true,
                 repairTypeTags: true,
@@ -3183,10 +3183,8 @@
                 return;
             }
             
-            // Create RO ID
-            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived || 'NODATE'}`;
-            
-            // Open checkin.html with RO ID in new tab
+            // Use PRVS ID for checkin URL
+            const roId = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
             const checkInURL = `https://patriotsrv.github.io/rv-dashboard/checkin.html?ro=${encodeURIComponent(roId)}`;
             window.open(checkInURL, '_blank');
         }
@@ -5639,7 +5637,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                         ` : ''}
                         
                         ${shouldShow('timeLogs') ? (() => {
-                            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived}`;
+                            const roId = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
                             const timeStats = calculateTotalHours(roId);
                             if (timeStats.sessionCount > 0) {
                                 return `
@@ -5713,7 +5711,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
         // Generate individual QR code
         function generateQRCode(canvasElement, ro, index) {
             // Create unique RO ID from customer name + date
-            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived || 'NODATE'}`;
+            const roId = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
             
             // Shorter URL format for better scannability
             const checkInURL = `https://patriotsrv.github.io/rv-dashboard/checkin.html?ro=${encodeURIComponent(roId)}`;
@@ -5807,7 +5805,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
             const ro = currentFilteredData[index];
             if (!ro) return;
             
-            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived || 'NODATE'}`;
+            const roId = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
             const checkInURL = `https://patriotsrv.github.io/rv-dashboard/checkin.html?ro=${encodeURIComponent(roId)}&customer=${encodeURIComponent(ro.customerName)}`;
             
             // Create modal overlay
@@ -5888,7 +5886,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
             if (!ro) return;
             
             // Create printable label
-            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived || 'NODATE'}`;
+            const roId = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
             const canvas = document.getElementById(`qr-${index}`);
             
             // Open print window with just the QR code and customer name
@@ -6550,23 +6548,19 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                         await getUserInfo();
                         updateAuthStatus(true);
 
-                        // ── Supabase: sign in with Google token ──────────────
-                        try {
-                            const { data: sbData, error: sbErr } = await getSB().auth.signInWithIdToken({
-                                provider: 'google',
-                                token: resp.id_token || accessToken,
-                            });
-                            if (sbData?.session) {
-                                supabaseSession = sbData.session;
-                                console.log('✅ Supabase session established');
-                                await upsertUser(supabaseSession);
-                                await loadUserRoles();
-                                updateViewModeDropdown();
-                            } else if (sbErr) {
-                                console.warn('Supabase sign-in warning:', sbErr.message);
-                            }
-                        } catch(e) {
-                            console.warn('Supabase auth attempt failed:', e);
+                        // ── Store identity for persistent sessions ──────────
+                        // Data ops use anon key (no Supabase auth session needed).
+                        // We store user identity in localStorage long-term.
+                        // Google token only needed for photo uploads.
+                        if (currentUser?.email) {
+                            localStorage.setItem('prvs_user_identity', JSON.stringify({
+                                email: currentUser.email,
+                                name:  currentUser.name,
+                                savedAt: Date.now(),
+                            }));
+                            console.log('✅ User identity saved for persistent sessions');
+                            await loadUserRoles();
+                            updateViewModeDropdown();
                         }
                         // ─────────────────────────────────────────────────────
 
@@ -7787,7 +7781,7 @@ If a field is not found, omit it entirely. Do not include null or empty string v
 
         async function openTimeLogsModal(index) {
             const ro = getROFromFilteredView(index);
-            const roId = `RO-${ro.customerName.replace(/\s+/g, '-')}-${ro.dateReceived}`;
+            const roId = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
             
             // Refresh time logs from Google Sheets first
             if (accessToken) {
