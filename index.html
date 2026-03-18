@@ -4335,6 +4335,177 @@ If a field is not found, omit it entirely. Do not include null or empty string v
         }
 
 
+
+        // ── Photo Migration Tool ──────────────────────────────────────
+
+        async function openPhotoMigrationTool() {
+            closeAdminSettingsModal();
+
+            const modalHTML = `
+                <div id="photoMigrateModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;">
+                    <div style="background:white;border-radius:16px;padding:28px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;">
+                        <h2 style="color:#1e293b;font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;margin-bottom:8px;">🖼️ Migrate Photos to Supabase</h2>
+                        <p style="color:#64748b;font-size:0.9rem;margin-bottom:20px;">This tool downloads all RV photos from Google Drive and uploads them to Supabase Storage. Photo URLs in the database will be updated automatically.</p>
+                        <div id="migrateStatus" style="background:#f8fafc;border-radius:8px;padding:16px;margin-bottom:16px;font-size:0.85rem;color:#475569;min-height:60px;">
+                            Ready to start. Click Migrate to begin.
+                        </div>
+                        <div style="background:#e2e8f0;border-radius:8px;height:12px;margin-bottom:16px;overflow:hidden;">
+                            <div id="migrateProgress" style="background:linear-gradient(135deg,#10b981,#059669);height:100%;width:0%;transition:width 0.3s;border-radius:8px;"></div>
+                        </div>
+                        <div id="migrateStats" style="display:flex;gap:16px;margin-bottom:20px;font-size:0.85rem;">
+                            <span>✅ Migrated: <strong id="migratedCount">0</strong></span>
+                            <span>⏭️ Skipped: <strong id="skippedCount">0</strong></span>
+                            <span>❌ Failed: <strong id="failedCount">0</strong></span>
+                            <span>📊 Total: <strong id="totalCount">0</strong></span>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <button id="startMigrateBtn" onclick="runPhotoMigration()" style="flex:1;padding:12px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;">
+                                🚀 Start Migration
+                            </button>
+                            <button onclick="document.getElementById('photoMigrateModal').remove()" style="padding:12px 24px;background:#64748b;color:white;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        }
+
+        async function runPhotoMigration() {
+            const btn = document.getElementById('startMigrateBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Migrating...';
+
+            const statusEl = document.getElementById('migrateStatus');
+            const progressEl = document.getElementById('migrateProgress');
+            const migratedEl = document.getElementById('migratedCount');
+            const skippedEl = document.getElementById('skippedCount');
+            const failedEl = document.getElementById('failedCount');
+            const totalEl = document.getElementById('totalCount');
+
+            let migrated = 0, skipped = 0, failed = 0;
+
+            try {
+                // Get all ROs with photos
+                const { data: ros, error } = await getSB()
+                    .from('repair_orders')
+                    .select('id, ro_id, customer_name, photo_url, photo_library')
+                    .not('photo_url', 'is', null)
+                    .neq('photo_url', '');
+
+                if (error) throw error;
+
+                // Collect all photos to migrate
+                const photoJobs = [];
+                for (const ro of ros) {
+                    if (ro.photo_url && ro.photo_url.includes('drive.google.com')) {
+                        photoJobs.push({ roId: ro.id, roStr: ro.ro_id, field: 'photo_url', url: ro.photo_url, library: ro.photo_library });
+                    }
+                }
+
+                totalEl.textContent = photoJobs.length;
+                statusEl.textContent = `Found ${photoJobs.length} photos to migrate...`;
+
+                if (photoJobs.length === 0) {
+                    statusEl.textContent = '✅ No Drive photos found — all photos already in Supabase or no photos exist.';
+                    btn.textContent = '✅ Done';
+                    return;
+                }
+
+                for (let i = 0; i < photoJobs.length; i++) {
+                    const job = photoJobs[i];
+                    const progress = Math.round((i / photoJobs.length) * 100);
+                    progressEl.style.width = progress + '%';
+                    statusEl.textContent = `[${i+1}/${photoJobs.length}] Migrating photo for ${job.roStr}...`;
+
+                    try {
+                        // Extract file ID from Drive URL
+                        const fileIdMatch = job.url.match(/[?&]id=([^&]+)/) || job.url.match(/\/file\/d\/([^/]+)/);
+                        if (!fileIdMatch) { skipped++; skippedEl.textContent = skipped; continue; }
+                        const fileId = fileIdMatch[1];
+
+                        // Check if already migrated (not a Drive URL)
+                        if (!job.url.includes('drive.google.com')) { skipped++; skippedEl.textContent = skipped; continue; }
+
+                        // Fetch from Google Drive using access token
+                        const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+                        const response = await fetch(driveUrl, {
+                            headers: { Authorization: `Bearer ${accessToken}` }
+                        });
+
+                        if (!response.ok) {
+                            console.warn(`Failed to fetch ${fileId}:`, response.status);
+                            failed++; failedEl.textContent = failed; continue;
+                        }
+
+                        const blob = await response.blob();
+                        const ext = blob.type.split('/')[1] || 'jpg';
+                        const filename = `${job.roStr}/${fileId}.${ext}`;
+
+                        // Upload to Supabase Storage
+                        const { data: uploadData, error: uploadErr } = await getSB()
+                            .storage
+                            .from('rv-media')
+                            .upload(filename, blob, {
+                                contentType: blob.type,
+                                upsert: true
+                            });
+
+                        if (uploadErr) {
+                            console.warn('Upload error:', uploadErr);
+                            failed++; failedEl.textContent = failed; continue;
+                        }
+
+                        // Get public URL
+                        const { data: urlData } = getSB().storage.from('rv-media').getPublicUrl(filename);
+                        const newUrl = urlData?.publicUrl;
+
+                        if (!newUrl) { failed++; failedEl.textContent = failed; continue; }
+
+                        // Update repair_orders photo_url
+                        await getSB().from('repair_orders').update({
+                            photo_url: newUrl,
+                            updated_at: new Date().toISOString()
+                        }).eq('id', job.roId);
+
+                        // Update photo_library if it contains this URL
+                        if (job.library) {
+                            try {
+                                const lib = typeof job.library === 'string' ? JSON.parse(job.library) : job.library;
+                                if (lib.photos) {
+                                    lib.photos = lib.photos.map(p => (typeof p === 'string' && p.includes(fileId)) ? newUrl : p);
+                                    await getSB().from('repair_orders').update({
+                                        photo_library: lib
+                                    }).eq('id', job.roId);
+                                }
+                            } catch(e) { console.warn('Library update failed:', e); }
+                        }
+
+                        migrated++; migratedEl.textContent = migrated;
+
+                    } catch(e) {
+                        console.warn('Migration error for', job.roStr, e);
+                        failed++; failedEl.textContent = failed;
+                    }
+
+                    // Small delay to avoid rate limiting
+                    await new Promise(r => setTimeout(r, 200));
+                }
+
+                progressEl.style.width = '100%';
+                statusEl.textContent = `✅ Migration complete! ${migrated} migrated, ${skipped} skipped, ${failed} failed.`;
+                btn.textContent = '✅ Done — Reload Dashboard';
+                btn.onclick = () => { document.getElementById('photoMigrateModal').remove(); loadDataFromSupabase(); };
+
+            } catch(e) {
+                statusEl.textContent = '❌ Error: ' + e.message;
+                btn.disabled = false;
+                btn.textContent = '🔄 Retry';
+                btn.onclick = runPhotoMigration;
+            }
+        }
+
         // ── Parts Management ─────────────────────────────────────────
 
         let partsData = {}; // Cache: { roId: [parts array] }
@@ -7903,6 +8074,13 @@ If a field is not found, omit it entirely. Do not include null or empty string v
                             📤 Export Configuration Code
                         </button>
                         
+                        <div style="border-top:1px solid #e2e8f0;margin:16px 0;padding-top:16px;">
+                            <div style="font-size:0.85rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">🗄️ Database Tools</div>
+                            <button onclick="openPhotoMigrationTool()" style="width: 100%; padding: 12px 24px; background: linear-gradient(135deg,#10b981,#059669); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; margin-bottom: 8px;">
+                                🖼️ Migrate Photos to Supabase Storage
+                            </button>
+                        </div>
+
                         <button onclick="closeAdminSettingsModal()" style="width: 100%; padding: 12px 24px; background: #64748b; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600;">
                             Close
                         </button>
