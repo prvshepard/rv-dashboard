@@ -5977,7 +5977,6 @@ If a field is not found, omit it entirely. Do not include null or empty string v
         // ── Supabase Configuration ──────────────────────────────────
         const SUPABASE_URL = 'https://axfejhudchdejoiwaetq.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4ZmVqaHVkY2hkZWpvaXdhZXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3OTE2NzEsImV4cCI6MjA4OTM2NzY3MX0.CF7XxtXOHg6Zpsb31m55YsMVd2QHSE5L3t7_FtMFfxY';
-        if (typeof _sb === 'undefined') { console.error('Supabase SDK not loaded!'); }
         const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let supabaseSession = null;
 
