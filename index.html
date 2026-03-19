@@ -6849,6 +6849,7 @@ Notes: ${notes}` : '',
         var tokenClient;
         var accessToken = null;
         var googleIdToken = null; // id_token for Supabase RBAC
+        var supabaseNonce = null;  // raw nonce — shared between gisLoaded and tokenClient callback
         var currentUser = null;
         
         // Admin access control
@@ -7263,9 +7264,9 @@ Notes: ${notes}` : '',
             // Initialize ID token client — captures id_token for Supabase RBAC
             // Generate nonce for Supabase — must be passed to both Google and Supabase
             const rawNonce = crypto.getRandomValues(new Uint8Array(32));
-            const nonce = btoa(String.fromCharCode(...rawNonce));
+            supabaseNonce = btoa(String.fromCharCode(...rawNonce));
             // SHA-256 hash of nonce for Google
-            const nonceHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(nonce));
+            const nonceHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(supabaseNonce));
             const hashedNonce = btoa(String.fromCharCode(...new Uint8Array(nonceHash)));
 
             google.accounts.id.initialize({
@@ -7280,7 +7281,7 @@ Notes: ${notes}` : '',
                                 const { data: sbData, error: sbError } = await getSB().auth.signInWithIdToken({
                                     provider: 'google',
                                     token: googleIdToken,
-                                    nonce: nonce, // unhashed nonce — Supabase hashes it to verify
+                                    nonce: supabaseNonce, // unhashed nonce — Supabase hashes it to verify
                                 });
                                 if (sbError) {
                                     console.warn('⚠️ Supabase signInWithIdToken failed:', sbError.message);
@@ -7346,6 +7347,7 @@ Notes: ${notes}` : '',
                                 const { data: sbData, error: sbError } = await getSB().auth.signInWithIdToken({
                                     provider: 'google',
                                     token: idTokenToUse || '',
+                                    nonce: supabaseNonce || undefined,
                                 });
                                 if (sbError) {
                                     console.warn('⚠️ Supabase signInWithIdToken failed (non-fatal):', sbError.message);
