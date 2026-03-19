@@ -860,6 +860,8 @@ const buildCss = (t) => {
   /* ── PRINT STYLES ────────────────────────────────────────────────────── */
   @media print{
     body{background:#fff !important;color:#000 !important;}
+    *{box-shadow:none !important;text-shadow:none !important;}
+    .builder-section,.quote-items-section,.summary-grid-card{border-radius:0 !important;border:1px solid #ccc !important;}
     .topbar,.bottom-nav,.summary-grid,.export-bar,.export-btn,.builder-section:not(.quote-items-section):not(.checklist-section):not(.diagram-canvas-section){display:none !important;}
     .page-header:not(.print-show){display:none !important;}
     .print-show{display:block !important;}
