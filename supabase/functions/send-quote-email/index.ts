@@ -1,12 +1,11 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import nodemailer from "npm:nodemailer@6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -47,15 +46,15 @@ serve(async (req) => {
   <p>Dear ${customerName},</p>
   <p>Thank you for your interest in our solar installation services. Please find your quote details below.</p>
   ${roNumber ? `<p><strong>Repair Order:</strong> RO #${roNumber}</p>` : ""}
-  <p><strong>Quote #${quoteNumber}</strong> &nbsp;·&nbsp; <strong>Total: $${(grandTotal || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong></p>
+  <p><strong>Quote #${quoteNumber}</strong> &nbsp;&middot;&nbsp; <strong>Total: $${Number(grandTotal || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong></p>
   <div style="background: #f5f5f5; border-radius: 8px; padding: 16px; margin: 20px 0;">
     <pre style="font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; margin: 0;">${body}</pre>
   </div>
   <p>To discuss this quote or schedule your installation, please contact us:</p>
   <p>
-    📍 11399 US 380, Krum TX 76249<br>
-    📞 <a href="tel:9404885047">(940) 488-5047</a><br>
-    🌐 <a href="https://patriotsrvservices.com">patriotsrvservices.com</a>
+    &#128205; 11399 US 380, Krum TX 76249<br>
+    &#128222; <a href="tel:9404885047">(940) 488-5047</a><br>
+    &#127760; <a href="https://patriotsrvservices.com">patriotsrvservices.com</a>
   </p>
   <p style="color: #888; font-size: 11px; border-top: 1px solid #ddd; padding-top: 12px; margin-top: 20px;">
     This quote is valid for 30 days. Prices subject to change based on parts availability.
@@ -63,24 +62,20 @@ serve(async (req) => {
 </body>
 </html>`;
 
-    const client = new SMTPClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 465,
-        tls: true,
-        auth: { username: gmailUser, password: gmailPass },
-      },
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: { user: gmailUser, pass: gmailPass },
     });
 
-    await client.send({
-      from: `Patriots RV Services <${gmailUser}>`,
+    await transporter.sendMail({
+      from: `"Patriots RV Services" <${gmailUser}>`,
       to,
       subject,
-      content: body,
+      text: body,
       html: htmlBody,
     });
-
-    await client.close();
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
