@@ -2598,17 +2598,19 @@ function App() {
     const updated = [snap, ...projects.filter(p=>p.id!==snap.id).slice(0,19)];
     setProjects(updated); saveProjects(updated);
     // Also save to Supabase for cross-device access
-    try {
-        const userEmail = solarCurrentUser?.email || 'unknown';
-        await getSB().from('config').upsert({
-            key: `solar_project_${userEmail}_${(projectName||'untitled').replace(/\s+/g,'_').toLowerCase()}_${Date.now()}`,
-            value: snap,
-            updated_at: new Date().toISOString(),
-        }, { onConflict: 'key' });
-        showToast('Project saved to cloud ☁️', 'ok');
-    } catch(e) {
-        showToast('Saved locally (cloud unavailable)', 'warn');
-    }
+    (async () => {
+        try {
+            const userEmail = solarCurrentUser?.email || 'unknown';
+            await getSB().from('config').upsert({
+                key: `solar_project_${userEmail}_${(projectName||'untitled').replace(/\s+/g,'_').toLowerCase()}_${Date.now()}`,
+                value: snap,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'key' });
+            showToast('Project saved to cloud ☁️', 'ok');
+        } catch(e) {
+            showToast('Saved locally (cloud unavailable)', 'warn');
+        }
+    })();
   };
   const loadProject = (snap) => {
     setCoachInfo(snap.coachInfo||{make:'',model:'',year:''});
