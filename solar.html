@@ -50,6 +50,7 @@ function saveSession(data) {
         localStorage.setItem('vf_session', JSON.stringify(data));
     }
     catch (e) { }
+    saveSessionToDb(data); // debounced 2s write to Supabase
 }
 function loadProjects() {
     try {
@@ -94,6 +95,47 @@ async function saveProjectsToDb(arr) {
             .upsert({ id: 'main', data: arr, updated_at: new Date().toISOString() });
     } catch(e) {}
 }
+
+// ── Session persistence (Supabase) ───────────────────────────────────────────
+let _sessionSaveTimer = null;
+function saveSessionToDb(data) {
+    if (!_sbSolar) return;
+    clearTimeout(_sessionSaveTimer);
+    _sessionSaveTimer = setTimeout(async () => {
+        try {
+            await _sbSolar.from('solar_settings')
+                .upsert({ key: 'session', value: data, updated_at: new Date().toISOString() });
+        } catch(e) {}
+    }, 2000); // debounce — only write after 2s of inactivity
+}
+async function loadSessionFromDb() {
+    if (!_sbSolar) return null;
+    try {
+        const { data, error } = await _sbSolar.from('solar_settings')
+            .select('value').eq('key', 'session').single();
+        if (error || !data) return null;
+        return data.value || null;
+    } catch(e) { return null; }
+}
+
+// ── Quote number persistence (Supabase) ──────────────────────────────────────
+async function loadQuoteNumberFromDb() {
+    if (!_sbSolar) return null;
+    try {
+        const { data, error } = await _sbSolar.from('solar_settings')
+            .select('value').eq('key', 'last_quote').single();
+        if (error || !data) return null;
+        return parseInt(data.value) || null;
+    } catch(e) { return null; }
+}
+async function saveQuoteNumberToDb(n) {
+    if (!_sbSolar) return;
+    try {
+        await _sbSolar.from('solar_settings')
+            .upsert({ key: 'last_quote', value: n, updated_at: new Date().toISOString() });
+    } catch(e) {}
+}
+
 const GOALS = [
     { id: "maintain", label: "Maintain Existing System", icon: "" },
     { id: "fridge", label: "Run a Fridge", icon: "🧊" },
@@ -1965,6 +2007,15 @@ function App() {
         const last = parseInt(localStorage.getItem('pp_last_quote') || '1000');
         return saved?.quoteNumber || last;
     });
+    // Sync quote number from Supabase on mount — prevents duplicate numbers across devices
+    (0, React.useEffect)(() => {
+        loadQuoteNumberFromDb().then(dbNum => {
+            if (dbNum && dbNum > quoteNumber) {
+                setQuoteNumber(dbNum);
+                try { localStorage.setItem('pp_last_quote', String(dbNum)); } catch(e) {}
+            }
+        });
+    }, []);
     const [customTips, setCustomTips] = (0, React.useState)(saved?.customTips || [
         { id: "ct_1", section: "General Wiring", text: "Label every wire at both ends with heat-shrink label sleeves before routing — impossible to trace after completion.", critical: false, active: true },
         { id: "ct_2", section: "General Wiring", text: "Use tinned marine-grade wire for all DC runs — plain copper corrodes in RV environments.", critical: true, active: true },
@@ -2055,6 +2106,40 @@ function App() {
         });
     }, []);
     const [projectsTab, setProjectsTab] = (0, React.useState)("saved");
+    // Sync session from Supabase on mount — lets you resume work from any device
+    (0, React.useEffect)(() => {
+        loadSessionFromDb().then(dbSession => {
+            if (dbSession) {
+                try { localStorage.setItem('vf_session', JSON.stringify(dbSession)); } catch(e) {}
+                // Individual state setters — restore all session fields from DB
+                if (dbSession.theme !== undefined) setTheme(dbSession.theme);
+                if (dbSession.tab !== undefined) setTab(dbSession.tab);
+                if (dbSession.step !== undefined) setStep(dbSession.step);
+                if (dbSession.goal !== undefined) setGoal(dbSession.goal);
+                if (dbSession.rvType !== undefined) setRvType(dbSession.rvType);
+                if (dbSession.coachInfo) setCoachInfo(dbSession.coachInfo);
+                if (dbSession.customerInfo) setCustomerInfo(dbSession.customerInfo);
+                if (dbSession.inverterQtys) setInverterQtys(dbSession.inverterQtys);
+                if (dbSession.mpptQtys) setMpptQtys(dbSession.mpptQtys);
+                if (dbSession.batteryQtys) setBatteryQtys(dbSession.batteryQtys);
+                if (dbSession.panelQtys) setPanelQtys(dbSession.panelQtys);
+                if (dbSession.accessoryQtys) setAccessoryQtys(dbSession.accessoryQtys);
+                if (dbSession.bosQtys) setBosQtys(dbSession.bosQtys);
+                if (dbSession.wireRuns) setWireRuns(dbSession.wireRuns);
+                if (dbSession.loads) setLoads(dbSession.loads);
+                if (dbSession.siteNotes !== undefined) setSiteNotes(dbSession.siteNotes);
+                if (dbSession.existing) setExisting(dbSession.existing);
+                if (dbSession.projectName !== undefined) setProjectName(dbSession.projectName);
+                if (dbSession.laborRate !== undefined) setLaborRate(dbSession.laborRate);
+                if (dbSession.depositPct !== undefined) setDepositPct(dbSession.depositPct);
+                if (dbSession.quoteNotes !== undefined) setQuoteNotes(dbSession.quoteNotes);
+                if (dbSession.quoteTerms !== undefined) setQuoteTerms(dbSession.quoteTerms);
+                if (dbSession.customLineItems) setCustomLineItems(dbSession.customLineItems);
+                if (dbSession.battWiringMode !== undefined) setBattWiringMode(dbSession.battWiringMode);
+                if (dbSession.diagNodePos) setDiagNodePos(dbSession.diagNodePos);
+            }
+        });
+    }, []);
     // ── Wire Size Chart ──────────────────────────────────────────────────────
     const [wsAmps, setWsAmps] = (0, React.useState)(100);
     const [wsLen, setWsLen] = (0, React.useState)(10);
@@ -5138,7 +5223,7 @@ function App() {
                         React.createElement("div", { onClick: () => { navigator.clipboard.writeText("Q#" + quoteNumber); showToast("Quote # copied", "ok"); }, style: { fontSize: 18, fontWeight: 800, color: "#003087", letterSpacing: "-0.5px", cursor: "pointer", userSelect: "none" }, title: "Click to copy" },
                             "Quote #",
                             quoteNumber),
-                        React.createElement("button", { onClick: () => { const n = quoteNumber + 1; setQuoteNumber(n); localStorage.setItem('pp_last_quote', n); showToast('Quote #' + n, 'ok'); }, className: "no-print", style: { fontSize: 9, padding: "2px 6px", borderRadius: 4, border: "1px solid #bbb", background: "transparent", color: "#888", cursor: "pointer" } }, "+1")),
+                        React.createElement("button", { onClick: () => { const n = quoteNumber + 1; setQuoteNumber(n); localStorage.setItem('pp_last_quote', n); saveQuoteNumberToDb(n); showToast('Quote #' + n, 'ok'); }, className: "no-print", style: { fontSize: 9, padding: "2px 6px", borderRadius: 4, border: "1px solid #bbb", background: "transparent", color: "#888", cursor: "pointer" } }, "+1")),
                     React.createElement("div", { style: { marginTop: 4 } }, new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })),
                     customerInfo.name && React.createElement("div", { style: { marginTop: 3, fontWeight: 700, fontSize: 13 } }, customerInfo.name),
                     customerInfo.phone && React.createElement("div", { style: { marginTop: 1 } }, customerInfo.phone),
@@ -5832,7 +5917,7 @@ function App() {
                         React.createElement("div", { style: { flex: "0 0 140px" } },
                             React.createElement("div", { style: { fontSize: 10, color: "var(--muted)", marginBottom: 4 } }, "Quote Number"),
                             React.createElement("input", { type: "number", value: quoteNumber, onChange: e => setQuoteNumber(Number(e.target.value)), style: { width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg2)", color: "var(--text)", fontSize: 13, fontWeight: 700, fontFamily: "'Roboto Mono',monospace" } })),
-                        React.createElement("button", { onClick: () => { const next = quoteNumber + 1; setQuoteNumber(next); localStorage.setItem('pp_last_quote', String(next)); showToast("Quote #" + next + " ready", "ok"); }, style: { padding: "7px 14px", borderRadius: 7, border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontSize: 11, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" } }, "+ Next Quote")),
+                        React.createElement("button", { onClick: () => { const next = quoteNumber + 1; setQuoteNumber(next); localStorage.setItem('pp_last_quote', String(next)); saveQuoteNumberToDb(next); showToast("Quote #" + next + " ready", "ok"); }, style: { padding: "7px 14px", borderRadius: 7, border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontSize: 11, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" } }, "+ Next Quote")),
                     React.createElement("div", null,
                         React.createElement("div", { style: { fontSize: 10, color: "var(--muted)", marginBottom: 4 } },
                             "Quote Terms & Conditions ",
