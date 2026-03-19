@@ -598,6 +598,30 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(255, 204, 0, 0.3);
         }
+        .schedule-ro-btn {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(135deg,rgba(57,255,110,0.15),rgba(57,255,110,0.08));
+            border: 1px solid rgba(57,255,110,0.4);
+            border-radius: 8px;
+            color: #39ff6e;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 6px;
+        }
+        .schedule-ro-btn:hover {
+            background: rgba(57,255,110,0.3);
+            border-color: #39ff6e;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(57,255,110,0.3);
+        }
+
         .archive-ro-btn {
             width: 100%;
             padding: 10px;
@@ -1261,6 +1285,13 @@
         @media (max-width: 768px) {
             h1 {
                 font-size: 2.5rem;
+            }
+
+            /* Stack Days on Lot filter vertically on mobile */
+            .filter-section[style*="flex-direction: row"] {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 8px !important;
             }
 
             .board-grid {
@@ -6338,7 +6369,7 @@ Notes: ${notes}` : '',
                         </button>
                         ` : ''}
                         ${(isAdmin() || hasRole('Manager')) && ro.status !== 'Delivered/Cashed Out' ? `
-                        <button class="schedule-ro-btn" onclick="openScheduleModal(${index})" style="width:100%;padding:10px;margin-top:6px;background:linear-gradient(135deg,rgba(57,255,110,0.15),rgba(57,255,110,0.08));border:1px solid rgba(57,255,110,0.4);border-radius:8px;color:#39ff6e;font-size:0.85rem;font-weight:700;cursor:pointer;letter-spacing:0.03em;">
+                        <button class="schedule-ro-btn" onclick="openScheduleModal(${index})">
                             📅 ${ro.status === 'Scheduled' ? 'Reschedule' : 'Schedule'}
                         </button>` : ''}
 
