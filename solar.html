@@ -1381,7 +1381,7 @@ async function fetchRoofInfo(rvType, make, model, year) {
         throw new Error("Roof lookup failed: " + e.message);
     }
 }
-function RoofPlannerTab({ theme, coachInfo, rvType: intakeRvType }) {
+function RoofPlannerTab({ theme, coachInfo, rvType: intakeRvType, obstacles, setObstacles, panels, setPanels, starlinkItems, setStarlinkItems }) {
     const RULER = 22;
     const SVG_W = 800;
     const CLEAR_IN = 6;
@@ -1393,11 +1393,7 @@ function RoofPlannerTab({ theme, coachInfo, rvType: intakeRvType }) {
     const [error, setError] = (0, React.useState)(null);
     const [roofInfo, setRoofInfo] = (0, React.useState)(null);
     const [roofDims, setRoofDims] = (0, React.useState)({ lIn: 384, wIn: 96 });
-    const [obstacles, setObstacles] = (0, React.useState)([
-        { id: "ob_ac1", name: "A/C", xIn: 80, yIn: 22, lIn: 40, wIn: 30 },
-        { id: "ob_v1", name: "Vent", xIn: 220, yIn: 34, lIn: 22, wIn: 22 },
-    ]);
-    const [panels, setPanels] = (0, React.useState)([]);
+    // obstacles, panels, starlinkItems lifted to parent App component for save/load support
     const [selectedId, setSelectedId] = (0, React.useState)(null);
     const [panelModelId, setPanelModelId] = (0, React.useState)("ren_400");
     const [customL, setCustomL] = (0, React.useState)(60);
@@ -1407,7 +1403,6 @@ function RoofPlannerTab({ theme, coachInfo, rvType: intakeRvType }) {
     const [showGrid, setShowGrid] = (0, React.useState)(true);
     const [showClear, setShowClear] = (0, React.useState)(true);
     const [dragging, setDragging] = (0, React.useState)(null);
-    const [starlinkItems, setStarlinkItems] = (0, React.useState)([]); // [{id, modelId, xIn, yIn, rotated}]
     const [draggingSL, setDraggingSL] = (0, React.useState)(null);
     const [obstaclePickerOpen, setObstaclePickerOpen] = (0, React.useState)(false);
     const svgRef = (0, React.useRef)(null);
@@ -1982,6 +1977,12 @@ function App() {
     const [customLineItems, setCustomLineItems] = (0, React.useState)(saved?.customLineItems || []); // [{id,name,price,labor,notes}]
     const [battWiringMode, setBattWiringMode] = (0, React.useState)(saved?.battWiringMode || "homerun"); // "daisy" | "homerun"
     const [diagNodePos, setDiagNodePos] = (0, React.useState)(saved?.diagNodePos || {}); // {nodeId: {x,y}}
+    const [obstacles, setObstacles] = (0, React.useState)(saved?.obstacles || [
+        { id: "ob_ac1", name: "A/C", xIn: 80, yIn: 22, lIn: 40, wIn: 30 },
+        { id: "ob_v1", name: "Vent", xIn: 220, yIn: 34, lIn: 22, wIn: 22 },
+    ]);
+    const [panels, setPanels] = (0, React.useState)(saved?.panels || []);
+    const [starlinkItems, setStarlinkItems] = (0, React.useState)(saved?.starlinkItems || []);
     const [diagNotes, setDiagNotes] = (0, React.useState)(saved?.diagNotes || {}); // {nodeId: string}
     const [diagEditNote, setDiagEditNote] = (0, React.useState)(null); // nodeId being edited
     const [diagCondense, setDiagCondense] = (0, React.useState)(saved?.diagCondense !== undefined ? saved.diagCondense : false); // collapse identical parts
@@ -5080,7 +5081,7 @@ function App() {
             setWireRuns(prev => [...prev, { id: Date.now(), awg, strands, feet }]);
             setTab("builder");
         } }));
-    const render_roof = () => tab !== "roof" ? null : (React.createElement(RoofPlannerTab, { theme: theme, coachInfo: coachInfo, rvType: rvType }));
+    const render_roof = () => tab !== "roof" ? null : (React.createElement(RoofPlannerTab, { theme: theme, coachInfo: coachInfo, rvType: rvType, obstacles: obstacles, setObstacles: setObstacles, panels: panels, setPanels: setPanels, starlinkItems: starlinkItems, setStarlinkItems: setStarlinkItems }));
     const render_quote = () => tab !== "quote" ? null : (React.createElement("div", null,
         React.createElement("div", { className: "print-header", style: { marginBottom: 18, paddingBottom: 12, borderBottom: "2px solid #003087" } },
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
