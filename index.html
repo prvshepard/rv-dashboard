@@ -6850,6 +6850,7 @@ Notes: ${notes}` : '',
         var accessToken = null;
         var googleIdToken = null; // id_token for Supabase RBAC
         var supabaseNonce = null;  // raw nonce — shared between gisLoaded and tokenClient callback
+        var sessionRestoredFromCache = false; // set by loadSavedToken to prevent gisLoaded from re-authing
         var currentUser = null;
         
         // Admin access control
@@ -7112,6 +7113,7 @@ Notes: ${notes}` : '',
                     startTimeLogsAutoRefresh();
                     if (!isSafari) setupTokenRefresh();
 
+                    sessionRestoredFromCache = true;
                     console.log('✅ Session restored via Supabase');
                     return true;
                 }
@@ -7146,6 +7148,7 @@ Notes: ${notes}` : '',
                     initialLoadDone = true;
                     startTimeLogsAutoRefresh();
                     if (!isSafari) setupTokenRefresh();
+                    sessionRestoredFromCache = true;
 
                     return true;
                 } else if (lastAuthTime && !isSafari) {
@@ -7271,14 +7274,14 @@ Notes: ${notes}` : '',
 
             google.accounts.id.initialize({
                 client_id: GOOGLE_CONFIG.CLIENT_ID,
-                nonce: hashedNonce,
+                params: { nonce: hashedNonce },
                 callback: async (credentialResponse) => {
                     if (credentialResponse.credential) {
                         googleIdToken = credentialResponse.credential;
                         console.log('\u2705 Google id_token captured for Supabase RBAC');
-                        // Skip if Supabase session already active (loaded from saved session)
-                        if (supabaseSession) {
-                            console.log('\u2705 Supabase session already active — skipping signInWithIdToken');
+                        // Skip if session was restored from cache
+                        if (sessionRestoredFromCache || supabaseSession) {
+                            console.log('\u2705 Session already active — skipping signInWithIdToken');
                             return;
                         }
                         try {
@@ -7300,9 +7303,11 @@ Notes: ${notes}` : '',
                 },
                 auto_select: true,
             });
-            // Only prompt if no Supabase session yet — avoids nonce mismatch on cached sessions
-            if (!supabaseSession) {
+            // Only prompt if session not already restored from cache
+            if (!sessionRestoredFromCache) {
                 google.accounts.id.prompt();
+            } else {
+                console.log('✅ Session already restored — skipping One Tap prompt');
             }
 
             tokenClient = google.accounts.oauth2.initTokenClient({
