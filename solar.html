@@ -2042,8 +2042,15 @@ function App() {
     (0, React.useEffect)(() => {
         loadProjectsFromDb().then(dbProjects => {
             if (dbProjects && dbProjects.length > 0) {
+                // DB has data — use it as source of truth
                 setProjects(dbProjects);
                 try { localStorage.setItem('vf_projects', JSON.stringify(dbProjects)); } catch(e) {}
+            } else {
+                // DB is empty — migrate any existing localStorage projects up to Supabase
+                const localProjects = loadProjects();
+                if (localProjects && localProjects.length > 0) {
+                    saveProjectsToDb(localProjects);
+                }
             }
         });
     }, []);
