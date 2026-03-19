@@ -71,6 +71,7 @@ Deno.serve(async (req: Request) => {
 
     await transporter.sendMail({
       from: `"Patriots RV Services" <${gmailUser}>`,
+      replyTo: "Patriots RV Services <info@patriotsrvservices.com>",
       to,
       subject,
       text: body,
