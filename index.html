@@ -6848,6 +6848,7 @@ Notes: ${notes}` : '',
         var initialLoadDone = false;
         var tokenClient;
         var accessToken = null;
+        var googleIdToken = null; // id_token for Supabase RBAC
         var currentUser = null;
         
         // Admin access control
@@ -7258,6 +7259,20 @@ Notes: ${notes}` : '',
                 setTimeout(gisLoaded, 500);
                 return;
             }
+
+            // Initialize ID token client — captures id_token for Supabase RBAC
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CONFIG.CLIENT_ID,
+                callback: (credentialResponse) => {
+                    if (credentialResponse.credential) {
+                        googleIdToken = credentialResponse.credential;
+                        console.log('✅ Google id_token captured for Supabase RBAC');
+                    }
+                },
+                auto_select: true,
+            });
+            google.accounts.id.prompt(); // silent — no UI shown
+
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: GOOGLE_CONFIG.CLIENT_ID,
                 scope: GOOGLE_CONFIG.SCOPES,
@@ -7295,12 +7310,16 @@ Notes: ${notes}` : '',
                             // Exchange Google ID token for a real Supabase session.
                             // This enables proper RLS enforcement and replaces anon key writes.
                             try {
-                                // Google access token → Supabase session via signInWithIdToken
-                                // Note: requires the Google token to have id_token claim.
-                                // We use the access_token as a fallback identity signal.
+                                // Use Google id_token (JWT) for Supabase signInWithIdToken
+                                // id_token comes from google.accounts.id.initialize callback
+                                const idTokenToUse = googleIdToken || resp.id_token;
+                                if (!idTokenToUse) {
+                                    console.warn('⚠️ No Google id_token available — requesting via prompt...');
+                                    google.accounts.id.prompt();
+                                }
                                 const { data: sbData, error: sbError } = await getSB().auth.signInWithIdToken({
                                     provider: 'google',
-                                    token: resp.id_token || accessToken,
+                                    token: idTokenToUse || '',
                                 });
                                 if (sbError) {
                                     console.warn('⚠️ Supabase signInWithIdToken failed (non-fatal):', sbError.message);
