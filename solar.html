@@ -2168,6 +2168,14 @@ function App() {
     const [productPriceOverrides, setProductPriceOverrides] = (0, React.useState)({});
     const [showSmsModal, setShowSmsModal] = (0, React.useState)(false);
     const [showClearModal, setShowClearModal] = (0, React.useState)(false);
+    const [linkedRO, setLinkedRO] = (0, React.useState)(saved?.linkedRO || null);
+    const [showRoModal, setShowRoModal] = (0, React.useState)(false);
+    const [roSearch, setRoSearch] = (0, React.useState)('');
+    const [roResults, setRoResults] = (0, React.useState)([]);
+    const [roSearching, setRoSearching] = (0, React.useState)(false);
+    const [showEmailModal, setShowEmailModal] = (0, React.useState)(false);
+    const [emailSending, setEmailSending] = (0, React.useState)(false);
+    const [emailAddr, setEmailAddr] = (0, React.useState)('');
     const [batteryWiring, setBatteryWiring] = (0, React.useState)("homerun"); // "homerun" | "daisy"
     const [history, setHistory] = (0, React.useState)([]);
     const [toast, setToast] = (0, React.useState)(null); // {msg, type}
@@ -2243,7 +2251,7 @@ function App() {
             loads, loadSysV, sitePhotos, siteNotes,
             altAmps, dcDcChgAmps, shoreAmps, genKw,
             existing, projectName, laborOverrides, customLineItems, laborRate, depositPct, quoteNotes, customTips, customTips, priceOverrides, cablePriceOverrides,
-            quoteNumber, quoteTerms, companyLogo, battWiringMode, diagNodePos, diagNotes, diagCustomWires, diagWireOverrides, diagCondense, battWiringMode,
+            quoteNumber, quoteTerms, companyLogo, battWiringMode, diagNodePos, diagNotes, diagCustomWires, diagWireOverrides, diagCondense, battWiringMode, linkedRO,
         });
     }, [theme, tab, step, goal, rvType, coachInfo, customerInfo, survey,
         inverterQtys, mpptQtys, batteryQtys, panelQtys, accessoryQtys, bosQtys, wireRuns,
@@ -2938,6 +2946,90 @@ function App() {
         setShowSmsModal(false);
         showToast("SMS app opened", "ok");
     };
+    // ── RO Lookup / Link / Create ─────────────────────────────────────────────
+    const searchROs = async (q) => {
+        if (!q || q.trim().length < 2) { setRoResults([]); return; }
+        setRoSearching(true);
+        try {
+            const { data } = await _sbSolar.from('repair_orders')
+                .select('id, ro_number, customer_name, customer_email, customer_phone, year, make, model')
+                .or(`customer_name.ilike.%${q.trim()}%,ro_number.ilike.%${q.trim()}%`)
+                .limit(8);
+            setRoResults(data || []);
+        } catch(e) { setRoResults([]); } finally { setRoSearching(false); }
+    };
+    const linkRO = (ro) => {
+        setLinkedRO(ro);
+        setCustomerInfo(p => ({
+            ...p,
+            name: ro.customer_name || p.name,
+            phone: ro.customer_phone || p.phone,
+            email: ro.customer_email || p.email,
+        }));
+        if (ro.make) setCoachInfo(p => ({ ...p, year: ro.year || p.year, make: ro.make || p.make, model: ro.model || p.model }));
+        setEmailAddr(ro.customer_email || '');
+        setShowRoModal(false);
+        setRoSearch('');
+        setRoResults([]);
+        showToast(`Linked to RO #${ro.ro_number}`, 'ok');
+    };
+    const unlinkRO = () => { setLinkedRO(null); showToast('RO unlinked', 'info'); };
+    const createRO = async () => {
+        if (!customerInfo.name) { showToast('Enter customer name first', 'warn'); return; }
+        try {
+            const { data, error } = await _sbSolar.from('repair_orders').insert({
+                customer_name: customerInfo.name,
+                customer_email: customerInfo.email || null,
+                customer_phone: customerInfo.phone || null,
+                year: coachInfo.year || null,
+                make: coachInfo.make || null,
+                model: coachInfo.model || null,
+            }).select().single();
+            if (error) throw error;
+            setLinkedRO(data);
+            setEmailAddr(data.customer_email || customerInfo.email || '');
+            setShowRoModal(false);
+            showToast(`RO #${data.ro_number} created`, 'ok');
+        } catch(e) { showToast('Failed to create RO: ' + (e.message || e), 'err'); }
+    };
+    // ── Email quote ───────────────────────────────────────────────────────────
+    const buildEmailBody = () => {
+        const items = lineItems.filter(i => i.selected);
+        const lines = [`Patriots RV Services — Solar Quote #${quoteNumber}`, `Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`, ``];
+        if (customerInfo.name) lines.push(`Customer: ${customerInfo.name}`);
+        if (linkedRO) lines.push(`RO #: ${linkedRO.ro_number}`);
+        if (coachInfo.make) lines.push(`Vehicle: ${coachInfo.year || ''} ${coachInfo.make} ${coachInfo.model || ''}`.trim());
+        lines.push(``, `--- SYSTEM QUOTE ---`);
+        items.forEach(i => { lines.push(`${i.name}  x${i.qty}  $${(i.price * i.qty).toFixed(2)}`); });
+        lines.push(``, `Grand Total: $${grandTotal.toLocaleString('en-US', {minimumFractionDigits:2})}`, ``, `View full quote: https://patriotsrv.github.io/rv-dashboard/solar.html`, ``, `Patriots RV Services`, `11399 US 380, Krum TX 76249`, `(940) 488-5047`, `patriotsrvservices.com`);
+        return lines.join('\n');
+    };
+    const sendQuoteEmail = async () => {
+        if (!emailAddr) { showToast('Enter an email address', 'warn'); return; }
+        setEmailSending(true);
+        try {
+            const res = await fetch(`${_SB_URL}/functions/v1/send-quote-email`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${_SB_ANON}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: emailAddr,
+                    customerName: customerInfo.name || 'Valued Customer',
+                    quoteNumber,
+                    roNumber: linkedRO?.ro_number || null,
+                    grandTotal,
+                    body: buildEmailBody(),
+                })
+            });
+            if (!res.ok) { const t = await res.text(); throw new Error(t); }
+            // Save quote PDF link to RO if linked
+            if (linkedRO?.id) {
+                await _sbSolar.from('repair_orders').update({ solar_quote_number: quoteNumber, solar_quote_sent_at: new Date().toISOString() }).eq('id', linkedRO.id);
+            }
+            showToast('Quote emailed!', 'ok');
+            setShowEmailModal(false);
+        } catch(e) { showToast('Email failed — deploy Edge Function first', 'err'); console.error(e); }
+        finally { setEmailSending(false); }
+    };
     const addBosRec = (bosId, qty) => {
         setBosQtys(prev => ({ ...prev, [bosId]: (prev[bosId] || 0) + qty }));
     };
@@ -3358,6 +3450,19 @@ function App() {
                     React.createElement("div", { className: "survey-section-num" }, "1"),
                     React.createElement("div", { className: "survey-section-title" }, "Contact Information")),
                 React.createElement("div", { className: "survey-section-body" },
+                    linkedRO ? React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "rgba(76,175,80,0.12)", border: "1px solid rgba(76,175,80,0.4)", borderRadius: 8, marginBottom: 10 } },
+                        React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "var(--accent3)" } }, `✓ Linked to RO #${linkedRO.ro_number}`),
+                        React.createElement("button", { onClick: unlinkRO, style: { marginLeft: "auto", background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 18, lineHeight: 1 } }, "×"))
+                    : React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-end" } },
+                        React.createElement("div", { className: "survey-field", style: { flex: 1 } },
+                            React.createElement("div", { className: "survey-label" }, "Link to Existing RO (optional)"),
+                            React.createElement("input", { className: "survey-input", placeholder: "Search by RO# or customer name…", value: roSearch, onChange: e => { setRoSearch(e.target.value); searchROs(e.target.value); }, onKeyDown: e => e.key === 'Enter' && searchROs(roSearch) })),
+                        React.createElement("button", { onClick: () => setShowRoModal(true), style: { padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)", cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", marginBottom: 0 } }, "+ New RO")),
+                    !linkedRO && roResults.length > 0 && React.createElement("div", { style: { background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, marginBottom: 10, overflow: "hidden" } },
+                        roResults.map(ro => React.createElement("div", { key: ro.id, onClick: () => linkRO(ro), style: { padding: "9px 14px", borderBottom: "1px solid var(--border)", cursor: "pointer", fontSize: 13 }, onMouseEnter: e => e.currentTarget.style.background = "rgba(33,150,243,0.08)", onMouseLeave: e => e.currentTarget.style.background = "" },
+                            React.createElement("span", { style: { fontWeight: 700, color: "var(--accent)", marginRight: 10 } }, `RO #${ro.ro_number}`),
+                            ro.customer_name,
+                            ro.customer_phone ? ` · ${ro.customer_phone}` : ""))),
                     React.createElement("div", { className: "survey-field-row" },
                         React.createElement("div", { className: "survey-field", style: { flex: 2, minWidth: 200 } },
                             React.createElement("div", { className: "survey-label" }, "Full Name"),
@@ -5243,6 +5348,7 @@ function App() {
                     customerInfo.name && React.createElement("div", { style: { marginTop: 3, fontWeight: 700, fontSize: 13 } }, customerInfo.name),
                     customerInfo.phone && React.createElement("div", { style: { marginTop: 1 } }, customerInfo.phone),
                     customerInfo.email && React.createElement("div", { style: { marginTop: 1 } }, customerInfo.email),
+                    linkedRO && React.createElement("div", { style: { marginTop: 4, fontSize: 10, color: "#888", letterSpacing: ".04em" } }, `RO #${linkedRO.ro_number}`),
                     coachInfo.make && React.createElement("div", { style: { marginTop: 4, fontStyle: "italic" } },
                         coachInfo.year,
                         " ",
@@ -5265,6 +5371,9 @@ function App() {
                 React.createElement("button", { className: "export-btn csv", onClick: () => setShowSmsModal(true), disabled: grandTotal === 0, style: { opacity: grandTotal === 0 ? 0.4 : 1, borderColor: "rgba(33,150,243,0.4)", color: "var(--accent)" } },
                     React.createElement("span", { style: { fontSize: 15 } }, "\uD83D\uDCF1"),
                     " Send to Phone"),
+                React.createElement("button", { className: "export-btn csv", onClick: () => { setEmailAddr(customerInfo.email || linkedRO?.customer_email || ''); setShowEmailModal(true); }, disabled: grandTotal === 0, style: { opacity: grandTotal === 0 ? 0.4 : 1, borderColor: "rgba(200,16,46,0.4)", color: "#c8102e" } },
+                    React.createElement("span", { style: { fontSize: 15 } }, "\u2709\uFE0F"),
+                    " Email Quote"),
                 React.createElement("button", { onClick: () => {
                         if (window.confirm("Clear all selections and start over?")) {
                             _sessionStore = null;
@@ -5971,6 +6080,39 @@ function App() {
                 React.createElement("div", { style: { display: "flex", gap: 10 } },
                     React.createElement("button", { onClick: () => { navigator.clipboard.writeText(buildSmsBody()); showToast("Quote copied to clipboard", "ok"); }, style: { flex: 1, padding: "10px 0", borderRadius: 9, border: "1px solid var(--border)", background: "transparent", color: "var(--text2)", cursor: "pointer", fontSize: 13 } }, "Copy Text"),
                     React.createElement("button", { onClick: handleSendSms, style: { flex: 2, padding: "10px 0", borderRadius: 9, border: "none", background: "var(--accent)", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700 } }, "Open SMS App \u2192"))))),
+        showRoModal && React.createElement("div", { onClick: () => setShowRoModal(false), style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 8000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 } },
+            React.createElement("div", { onClick: e => e.stopPropagation(), style: { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 28, width: "100%", maxWidth: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 } },
+                    React.createElement("span", { style: { fontSize: 16, fontWeight: 700 } }, "🔗 Link to Repair Order"),
+                    React.createElement("button", { onClick: () => setShowRoModal(false), style: { background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer" } }, "✕")),
+                React.createElement("div", { style: { marginBottom: 12 } },
+                    React.createElement("label", { style: { display: "block", fontSize: 11, fontWeight: 600, color: "var(--text2)", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" } }, "Search by RO# or Customer Name"),
+                    React.createElement("input", { autoFocus: true, className: "survey-input", placeholder: "e.g. 1042 or Smith…", value: roSearch, onChange: e => { setRoSearch(e.target.value); searchROs(e.target.value); }, style: { width: "100%", boxSizing: "border-box" } })),
+                roSearching && React.createElement("div", { style: { fontSize: 12, color: "var(--muted)", marginBottom: 8 } }, "Searching…"),
+                roResults.length > 0 && React.createElement("div", { style: { background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, marginBottom: 16, overflow: "hidden", maxHeight: 220, overflowY: "auto" } },
+                    roResults.map(ro => React.createElement("div", { key: ro.id, onClick: () => linkRO(ro), style: { padding: "10px 14px", borderBottom: "1px solid var(--border)", cursor: "pointer" }, onMouseEnter: e => e.currentTarget.style.background = "rgba(33,150,243,0.08)", onMouseLeave: e => e.currentTarget.style.background = "" },
+                        React.createElement("span", { style: { fontWeight: 700, color: "var(--accent)", marginRight: 10 } }, `RO #${ro.ro_number}`),
+                        React.createElement("span", { style: { fontWeight: 600 } }, ro.customer_name),
+                        ro.customer_phone && React.createElement("span", { style: { color: "var(--muted)", fontSize: 12, marginLeft: 8 } }, ro.customer_phone),
+                        (ro.make) && React.createElement("div", { style: { fontSize: 11, color: "var(--muted)", marginTop: 2 } }, `${ro.year || ''} ${ro.make} ${ro.model || ''}`.trim())))),
+                React.createElement("div", { style: { borderTop: "1px solid var(--border)", paddingTop: 14, marginTop: 4 } },
+                    React.createElement("p", { style: { fontSize: 12, color: "var(--muted)", marginBottom: 10 } }, "No existing RO? Create one from the current customer info:"),
+                    React.createElement("button", { onClick: createRO, style: { width: "100%", padding: "11px 0", borderRadius: 9, border: "none", background: "var(--accent3)", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" } }, "＋ Create New RO from This Quote")))),
+        showEmailModal && React.createElement("div", { onClick: () => setShowEmailModal(false), style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 8000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 } },
+            React.createElement("div", { onClick: e => e.stopPropagation(), style: { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 28, width: "100%", maxWidth: 420, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 } },
+                    React.createElement("span", { style: { fontSize: 16, fontWeight: 700 } }, "✉️ Email Quote to Customer"),
+                    React.createElement("button", { onClick: () => setShowEmailModal(false), style: { background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer" } }, "✕")),
+                linkedRO && React.createElement("div", { style: { fontSize: 12, color: "var(--accent3)", marginBottom: 12, fontWeight: 600 } }, `Linked to RO #${linkedRO.ro_number}`),
+                React.createElement("div", { style: { marginBottom: 14 } },
+                    React.createElement("label", { style: { display: "block", fontSize: 11, fontWeight: 600, color: "var(--text2)", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" } }, "Send To"),
+                    React.createElement("input", { type: "email", autoFocus: true, placeholder: "customer@email.com", value: emailAddr, onChange: e => setEmailAddr(e.target.value), onKeyDown: e => e.key === 'Enter' && sendQuoteEmail(), style: { width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)", fontSize: 15, outline: "none", boxSizing: "border-box" } })),
+                React.createElement("div", { style: { background: "var(--panel2)", borderRadius: 8, padding: "10px 12px", marginBottom: 18, maxHeight: 160, overflowY: "auto" } },
+                    React.createElement("div", { style: { fontSize: 10, color: "var(--muted)", marginBottom: 6, fontWeight: 600, letterSpacing: ".05em", textTransform: "uppercase" } }, "Quote Summary Preview"),
+                    React.createElement("pre", { style: { fontSize: 10, color: "var(--text2)", fontFamily: "'Roboto Mono',monospace", margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5 } }, buildEmailBody())),
+                React.createElement("div", { style: { display: "flex", gap: 10 } },
+                    React.createElement("button", { onClick: () => { navigator.clipboard.writeText(buildEmailBody()); showToast('Copied to clipboard', 'ok'); }, style: { flex: 1, padding: "10px 0", borderRadius: 9, border: "1px solid var(--border)", background: "transparent", color: "var(--text2)", cursor: "pointer", fontSize: 13 } }, "Copy Text"),
+                    React.createElement("button", { onClick: sendQuoteEmail, disabled: emailSending, style: { flex: 2, padding: "10px 0", borderRadius: 9, border: "none", background: "#c8102e", color: "#fff", cursor: emailSending ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, opacity: emailSending ? 0.7 : 1 } }, emailSending ? "Sending…" : "Send Email →")))),
         toast && (React.createElement("div", { style: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: toast.type === "ok" ? "var(--accent3)" : toast.type === "warn" ? "var(--accent2)" : "var(--accent)", color: "#fff", padding: "10px 22px", borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 9999, boxShadow: "0 4px 20px rgba(0,0,0,0.4)", pointerEvents: "none", whiteSpace: "nowrap" } }, toast.msg))));
 }
 

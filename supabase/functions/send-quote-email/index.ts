@@ -1,0 +1,96 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const { to, customerName, quoteNumber, roNumber, grandTotal, body } = await req.json();
+
+    if (!to) {
+      return new Response(JSON.stringify({ error: "Missing 'to' address" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const gmailUser = Deno.env.get("GMAIL_USER");
+    const gmailPass = Deno.env.get("GMAIL_APP_PASSWORD");
+
+    if (!gmailUser || !gmailPass) {
+      return new Response(JSON.stringify({ error: "GMAIL_USER or GMAIL_APP_PASSWORD secret not set" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const subject = roNumber
+      ? `Patriots RV Services — Solar Quote #${quoteNumber} (RO #${roNumber})`
+      : `Patriots RV Services — Solar Quote #${quoteNumber}`;
+
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+  <div style="border-bottom: 3px solid #c8102e; padding-bottom: 16px; margin-bottom: 20px;">
+    <h1 style="color: #c8102e; margin: 0; font-size: 22px;">Patriots RV Services</h1>
+    <p style="margin: 4px 0 0; color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: .05em;">Your Mission Critical RV Service and Upgrade Center</p>
+  </div>
+  <p>Dear ${customerName},</p>
+  <p>Thank you for your interest in our solar installation services. Please find your quote details below.</p>
+  ${roNumber ? `<p><strong>Repair Order:</strong> RO #${roNumber}</p>` : ""}
+  <p><strong>Quote #${quoteNumber}</strong> &nbsp;·&nbsp; <strong>Total: $${(grandTotal || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong></p>
+  <div style="background: #f5f5f5; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <pre style="font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; margin: 0;">${body}</pre>
+  </div>
+  <p>To discuss this quote or schedule your installation, please contact us:</p>
+  <p>
+    📍 11399 US 380, Krum TX 76249<br>
+    📞 <a href="tel:9404885047">(940) 488-5047</a><br>
+    🌐 <a href="https://patriotsrvservices.com">patriotsrvservices.com</a>
+  </p>
+  <p style="color: #888; font-size: 11px; border-top: 1px solid #ddd; padding-top: 12px; margin-top: 20px;">
+    This quote is valid for 30 days. Prices subject to change based on parts availability.
+  </p>
+</body>
+</html>`;
+
+    const client = new SMTPClient({
+      connection: {
+        hostname: "smtp.gmail.com",
+        port: 465,
+        tls: true,
+        auth: { username: gmailUser, password: gmailPass },
+      },
+    });
+
+    await client.send({
+      from: `Patriots RV Services <${gmailUser}>`,
+      to,
+      subject,
+      content: body,
+      html: htmlBody,
+    });
+
+    await client.close();
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  } catch (err) {
+    console.error("send-quote-email error:", err);
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
