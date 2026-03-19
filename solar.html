@@ -31,6 +31,7 @@
     <div class="pp-bar"><div class="pp-fill"></div></div>
   </div>
   <div id="root"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script>
 const { useState, useEffect, useRef } = React;
 
@@ -64,6 +65,34 @@ function saveProjects(arr) {
         localStorage.setItem('vf_projects', JSON.stringify(arr));
     }
     catch (e) { }
+    saveProjectsToDb(arr); // also persist to Supabase
+}
+// ── Supabase client (solar projects) ────────────────────────────────────────
+const _SB_URL = 'https://axfejhudchdejoiwaetq.supabase.co';
+const _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4ZmVqaHVkY2hkZWpvaXdhZXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3OTE2NzEsImV4cCI6MjA4OTM2NzY3MX0.CF7XxtXOHg6Zpsb31m55YsMVd2QHSE5L3t7_FtMFfxY';
+let _sbSolar = null;
+try { _sbSolar = supabase.createClient(_SB_URL, _SB_ANON); } catch(e) {}
+
+async function loadProjectsFromDb() {
+    if (!_sbSolar) return [];
+    try {
+        const { data, error } = await _sbSolar
+            .from('solar_project_store')
+            .select('data')
+            .eq('id', 'main')
+            .single();
+        if (error || !data) return [];
+        return Array.isArray(data.data) ? data.data : [];
+    } catch(e) { return []; }
+}
+
+async function saveProjectsToDb(arr) {
+    if (!_sbSolar) return;
+    try {
+        await _sbSolar
+            .from('solar_project_store')
+            .upsert({ id: 'main', data: arr, updated_at: new Date().toISOString() });
+    } catch(e) {}
 }
 const GOALS = [
     { id: "maintain", label: "Maintain Existing System", icon: "" },
@@ -2009,6 +2038,15 @@ function App() {
     // ── Multi-Project ────────────────────────────────────────────────────────
     const [projects, setProjects] = (0, React.useState)(() => loadProjects());
     const [projectName, setProjectName] = (0, React.useState)(saved?.projectName || "");
+    // Sync projects from Supabase on mount — DB is source of truth across devices
+    (0, React.useEffect)(() => {
+        loadProjectsFromDb().then(dbProjects => {
+            if (dbProjects && dbProjects.length > 0) {
+                setProjects(dbProjects);
+                try { localStorage.setItem('vf_projects', JSON.stringify(dbProjects)); } catch(e) {}
+            }
+        });
+    }, []);
     const [projectsTab, setProjectsTab] = (0, React.useState)("saved");
     // ── Wire Size Chart ──────────────────────────────────────────────────────
     const [wsAmps, setWsAmps] = (0, React.useState)(100);
