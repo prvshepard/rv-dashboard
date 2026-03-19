@@ -25,7 +25,8 @@
 | `index.html` | **v1.264** | Main dashboard — repair orders, time tracking, parts, etc. |
 | `checkin.html` | **v1.26** | Technician clock-in/out, offline-first IndexedDB queue |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
-| `solar.html` | **v1.0** | Solar installation tracking |
+| `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup |
+| `supabase/functions/roof-lookup/index.ts` | **v1.0** | Edge Function proxy for Anthropic API calls (⚠️ requires deployment — see below) |
 | `README.md` | — | Basic repo readme |
 | `CLAUDE_CONTEXT.md` | — | This file — session continuity doc |
 | `.github/workflows/backup.yml` | — | Daily Supabase backup → private backup repo |
@@ -34,7 +35,7 @@
 
 ## Tech Stack
 
-- **Frontend:** Vanilla JS, HTML/CSS — no framework
+- **Frontend:** Vanilla JS (index/checkin/analytics); React 18.2.0 via CDN (solar.html v2.0)
 - **Auth:** Google Identity Services (GIS) — `signInWithIdToken` via Supabase
 - **Database:** Supabase (PostgreSQL + RLS)
 - **Storage:** Supabase Storage (`rv-media` bucket)
@@ -66,6 +67,30 @@ Supabase `signInWithIdToken` requires a nonce to prevent replay attacks. The cor
 - Helper function `has_role(role_name text)` — SECURITY DEFINER, checks `user_roles` + `roles` tables
 - Pattern: `TO authenticated USING (true)` for reads; `WITH CHECK (has_role('Admin'))` for restricted writes
 - **Status: ✅ Complete**
+
+### Supabase Edge Function — roof-lookup (⚠️ Deployment Required)
+solar.html v2.0 calls `https://axfejhudchdejoiwaetq.supabase.co/functions/v1/roof-lookup` for AI roof dimension lookup.
+
+The function file is committed at `supabase/functions/roof-lookup/index.ts` but **must be deployed to Supabase** to work:
+
+```bash
+# 1. Install Supabase CLI if not already (https://supabase.com/docs/guides/cli)
+npm install -g supabase
+
+# 2. Login and link project
+supabase login
+supabase link --project-ref axfejhudchdejoiwaetq
+
+# 3. Set your Anthropic API key as a secret (one-time)
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+
+# 4. Deploy the function
+supabase functions deploy roof-lookup
+```
+
+The AI roof lookup in solar.html will 404 until step 4 is done. Everything else in solar.html works without it.
+
+---
 
 ### Daily Backup
 - GitHub Actions workflow: `.github/workflows/backup.yml`
@@ -122,6 +147,7 @@ Supabase `signInWithIdToken` requires a nonce to prevent replay attacks. The cor
 | v1.262 | 2026-03-19 | index.html — Fix nonce placement: top-level in `google.accounts.id.initialize` |
 | v1.263 | 2026-03-19 | index.html — Fix nonce encoding: hex not base64; localStorage persistence |
 | **v1.264** | **2026-03-19** | **index.html — Add Analytics button (Admin only, dark green); version tags on all files** |
+| **solar v2.0** | **2026-03-19** | **solar.html rebuilt by tech — React 18, roof planner, AI lookup (fixed via Edge Function)** |
 
 ---
 
@@ -135,6 +161,8 @@ Supabase `signInWithIdToken` requires a nonce to prevent replay attacks. The cor
 - ✅ **Daily backup** — GitHub Actions, private repo, 30-day rolling, tested ✅
 - ✅ **GitHub PAT rotated** — New PAT with `repo` + `workflow` scopes
 - ✅ **CLAUDE_CONTEXT.md** — Cross-session continuity established
+- ✅ **solar.html v2.0** — Deployed; AI calls fixed via Supabase Edge Function (⚠️ Edge Function still needs `supabase functions deploy roof-lookup` to activate)
+- ✅ **roof-lookup Edge Function** — Code committed to `supabase/functions/roof-lookup/index.ts`, awaiting CLI deploy
 
 ---
 
@@ -144,6 +172,7 @@ Supabase `signInWithIdToken` requires a nonce to prevent replay attacks. The cor
 |---|---|
 | 2026-03-19 (session 1) | GitHub MCP confirmed, RBAC SQL, checkin.html v1.26, nonce fixes v1.262+v1.263, CLAUDE_CONTEXT.md created |
 | 2026-03-19 (session 2) | Nonce encoding fixed (hex), Analytics button added (v1.264), version tags on all files, daily backup workflow live, PAT rotated |
+| 2026-03-19 (session 3) | solar.html v2.0 deployed (fixed 2 broken Anthropic API calls via Edge Function proxy), roof-lookup Edge Function committed (needs CLI deploy) |
 
 ---
 
