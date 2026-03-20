@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-    PRVS Dashboard v1.270
+    PRVS Dashboard v1.271
     Released: 2026-03-20
+    v1.271: Fix photo & document uploads — uploadDocument migrated from Google Drive to Supabase Storage; uploadPhoto and uploadDocument now check supabaseSession before upload; session-expiry re-check added inside async onchange callback
     v1.270: RO Description edit — pre-fill modal with existing content, full replace on save, before/after audit log
     v1.269: Parts Request photo attachments — upload to Supabase Storage, add to RO photo_library, embed inline thumbnails in management email
     v1.268: Fix notes_type_check constraint error — use ro_status type + body prefix filter instead of parts_request type
@@ -2469,7 +2470,7 @@
                 <span id="totalRVs">0 RVs on Lot</span>
             </div>
             <div style="text-align: right; margin-top: 8px;">
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.270</span>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.271</span>
             </div>
         </header>
 
@@ -3354,8 +3355,8 @@
 
         // Photo Upload Function
         async function uploadPhoto(index) {
-            if (!getSB()) {
-                alert('Please connect to PRVS database first!');
+            if (!getSB() || !supabaseSession) {
+                alert('Session expired or not logged in. Please refresh the page and sign in again.');
                 return;
             }
 
@@ -3367,10 +3368,16 @@
             input.accept = 'image/*';
             input.multiple = true;
             // No capture attribute — lets mobile show native picker (Camera OR Photo Library)
-            
+
             input.onchange = async (e) => {
                 const files = Array.from(e.target.files);
                 if (!files.length) return;
+
+                // Re-check session inside async callback — session may have changed since picker opened
+                if (!getSB() || !supabaseSession) {
+                    alert('Session expired. Please refresh the page and sign in again.');
+                    return;
+                }
 
                 const cards = document.querySelectorAll('.ro-card');
                 const card = cards[index];
@@ -3577,42 +3584,31 @@
         async function uploadDocument(index, input) {
             const file = input.files[0];
             if (!file) return;
+
+            if (!getSB() || !supabaseSession) {
+                alert('Session expired or not logged in. Please refresh the page and sign in again.');
+                input.value = '';
+                return;
+            }
+
             const ro = currentFilteredData[index];
             const originalIndex = currentData.findIndex(d =>
                 d.customerName === ro.customerName && d.dateReceived === ro.dateReceived
             );
-            if (originalIndex === -1) return;
+            if (originalIndex === -1) { input.value = ''; return; }
 
             const uploadBtn = input.nextElementSibling;
             if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.textContent = '⏳ Uploading...'; }
 
             try {
-                const metadata = {
-                    name: file.name,
-                    parents: [GOOGLE_CONFIG.DRIVE_FOLDER_ID],
-                };
-                const form = new FormData();
-                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                form.append('file', file);
-
-                const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                    method: 'POST',
-                    headers: { Authorization: 'Bearer ' + accessToken },
-                    body: form,
-                });
-                if (!response.ok) throw new Error('Upload failed: ' + response.status);
-                const result = await response.json();
-
-                // Make publicly readable
-                await fetch('https://www.googleapis.com/drive/v3/files/' + result.id + '/permissions', {
-                    method: 'POST',
-                    headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ role: 'reader', type: 'anyone' }),
-                });
+                // Upload to Supabase Storage — same rv-media bucket, docs subfolder
+                const roId = currentData[originalIndex]?.roId || 'general';
+                const docUrl = await uploadToSupabaseStorage(file, roId + '/docs');
 
                 const ext = file.name.split('.').pop().toLowerCase();
-                const docType = ext === 'pdf' ? 'pdf' : ['jpg','jpeg','png','gif','webp'].includes(ext) ? 'image' : 'doc';
-                const docUrl = 'https://drive.google.com/file/d/' + result.id + '/view';
+                const docType = ext === 'pdf' ? 'pdf'
+                    : ['jpg','jpeg','png','gif','webp'].includes(ext) ? 'image'
+                    : 'doc';
 
                 await addDocToLibrary(originalIndex, docUrl, file.name, docType);
                 alert('✅ Document uploaded successfully!');
@@ -5896,7 +5892,7 @@ Notes: ${notes}` : '',
 
         // Initialize
         function init() {
-            console.log('📦 PRVS Dashboard v1.270 - Released 2026-03-20');
+            console.log('📦 PRVS Dashboard v1.271 - Released 2026-03-20');
 
             // Auto-fill saved Anthropic API key into both scan inputs
             const savedAnthropicKey = localStorage.getItem('prvs_anthropic_key');
