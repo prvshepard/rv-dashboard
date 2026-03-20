@@ -2994,14 +2994,25 @@ function App() {
     };
     // ── Email quote ───────────────────────────────────────────────────────────
     const buildEmailBody = () => {
-        const items = lineItems.filter(i => i.selected);
         const lines = [`Patriots RV Services — Solar Quote #${quoteNumber}`, `Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`, ``];
         if (customerInfo.name) lines.push(`Customer: ${customerInfo.name}`);
         if (linkedRO) lines.push(`RO #: ${linkedRO.ro_number}`);
-        if (coachInfo.make) lines.push(`Vehicle: ${coachInfo.year || ''} ${coachInfo.make} ${coachInfo.model || ''}`.trim());
+        if (coachInfo.make) lines.push(`Vehicle: ${[coachInfo.year, coachInfo.make, coachInfo.model].filter(Boolean).join(' ')}`);
         lines.push(``, `--- SYSTEM QUOTE ---`);
-        items.forEach(i => { lines.push(`${i.name}  x${i.qty}  $${(i.price * i.qty).toFixed(2)}`); });
-        lines.push(``, `Grand Total: $${grandTotal.toLocaleString('en-US', {minimumFractionDigits:2})}`, ``, `View full quote: https://patriotsrv.github.io/rv-dashboard/solar.html`, ``, `Patriots RV Services`, `11399 US 380, Krum TX 76249`, `(940) 488-5047`, `patriotsrvservices.com`);
+        const pushItem = (label, qty, price) => lines.push(`  ${label}  x${qty}  $${(price * qty).toLocaleString()}`);
+        Object.entries(inverterQtys).filter(([,q]) => q > 0).forEach(([id,q]) => { const x = PRODUCTS.inverters.find(m => m.id === id); if (x) pushItem(x.model, q, effPrice(id, x.price)); });
+        Object.entries(mpptQtys).filter(([,q]) => q > 0).forEach(([id,q]) => { const x = PRODUCTS.mppTs.find(m => m.id === id); if (x) pushItem(x.model, q, effPrice(id, x.price)); });
+        Object.entries(batteryQtys).filter(([,q]) => q > 0).forEach(([id,q]) => { const x = PRODUCTS.batteries.find(m => m.id === id); if (x) pushItem(`${x.brand} ${x.series} ${x.voltage}V ${x.ah}Ah`, q, effPrice(id, x.price)); });
+        Object.entries(panelQtys).filter(([,q]) => q > 0).forEach(([id,q]) => { const x = PRODUCTS.panels.find(m => m.id === id); if (x) pushItem(`${x.brand} ${x.model}`, q, effPrice(id, x.price)); });
+        Object.entries(accessoryQtys).filter(([,q]) => q > 0).forEach(([id,q]) => { const x = PRODUCTS.accessories.find(m => m.id === id); if (x) pushItem(x.name, q, effPrice(id, x.price)); });
+        Object.entries(bosQtys).filter(([,q]) => q > 0).forEach(([id,q]) => { const x = PRODUCTS.bos.find(m => m.id === id); if (x) pushItem(x.name, q, effPrice(id, x.price)); });
+        customLineItems.filter(i => i.name).forEach(i => lines.push(`  ${i.name}  $${Number(i.price||0).toLocaleString()}`));
+        lines.push(``, `Parts Subtotal:  $${partsTotal.toLocaleString(undefined,{maximumFractionDigits:0})}`);
+        lines.push(`Install Labor:   $${laborCost.toLocaleString(undefined,{maximumFractionDigits:0})} (${laborTotal.toFixed(1)}h @ $${laborRate}/hr)`);
+        if (configTotal > 0) lines.push(`Configuration:   $${configCost.toLocaleString(undefined,{maximumFractionDigits:0})} (${configTotal.toFixed(1)}h @ $${laborRate}/hr)`);
+        lines.push(`GRAND TOTAL:     $${grandTotal.toLocaleString(undefined,{maximumFractionDigits:0})}`);
+        lines.push(`Parts Deposit:   $${Math.round(partsTotal * depositPct / 100).toLocaleString()} (${depositPct}% due before ordering)`);
+        lines.push(``, `View full quote: https://patriotsrv.github.io/rv-dashboard/solar.html`, ``, `Patriots RV Services`, `11399 US 380, Krum TX 76249`, `(940) 488-5047`, `patriotsrvservices.com`);
         return lines.join('\n');
     };
     const sendQuoteEmail = async () => {
