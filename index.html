@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-    PRVS Dashboard v1.269
+    PRVS Dashboard v1.270
     Released: 2026-03-20
+    v1.270: RO Description edit — pre-fill modal with existing content, full replace on save, before/after audit log
     v1.269: Parts Request photo attachments — upload to Supabase Storage, add to RO photo_library, embed inline thumbnails in management email
     v1.268: Fix notes_type_check constraint error — use ro_status type + body prefix filter instead of parts_request type
     v1.267: Parts Request System — modal w/ voice dictation, neon-pink pulsing chip, RO Status auto-note, management email, Mark Parts Ordered flow; send-quote-email Edge Function extended for parts_request type
@@ -2468,7 +2469,7 @@
                 <span id="totalRVs">0 RVs on Lot</span>
             </div>
             <div style="text-align: right; margin-top: 8px;">
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.269</span>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.270</span>
             </div>
         </header>
 
@@ -3123,65 +3124,67 @@
             const field = fieldMapping[fieldName];
             if (!field) return;
 
-            // Decode HTML entities and newlines
+            // Decode HTML entities and newlines in current value
             const decodedValue = currentValue.replace(/&quot;/g, '"').replace(/\\n/g, '\n');
-            
-            // Show voice-enabled modal instead of prompt
-            const newUpdate = await showVoiceNotesModal(`Add update to ${field.name}:`);
-            
-            if (newUpdate === null || newUpdate.trim() === '') {
-                return; // User cancelled or entered nothing
-            }
 
             try {
                 const ro = currentFilteredData[index];
-                if (!ro) {
-                    alert('Error: Could not find the repair order.');
-                    return;
-                }
+                if (!ro) { alert('Error: Could not find the repair order.'); return; }
 
                 // Find original index in currentData
-                const originalIndex = currentData.findIndex(item => 
-                    item.customerName === ro.customerName && 
+                const originalIndex = currentData.findIndex(item =>
+                    item.customerName === ro.customerName &&
                     item.dateReceived === ro.dateReceived
                 );
+                if (originalIndex === -1) { alert('Error: Could not find the repair order in data.'); return; }
 
-                if (originalIndex === -1) {
-                    alert('Error: Could not find the repair order in data.');
+                // ── REPAIR DESCRIPTION — full edit (pre-filled, full replace, audited) ──
+                if (fieldName === 'repairDescription') {
+                    const edited = await showVoiceNotesModal(`Edit ${field.name}:`, decodedValue);
+                    if (edited === null) return; // cancelled
+                    const newValue = edited.trim();
+
+                    // Capture old value BEFORE mutation (ro still points to unmodified object)
+                    const oldValue = ro.repairDescription || '';
+
+                    // Update local data
+                    currentData[originalIndex].repairDescription = newValue;
+
+                    // Write to Supabase (full replace of description column)
+                    await updateFieldInSupabase(originalIndex, 'repairDescription', newValue);
+
+                    // Audit log — before & after
+                    await writeAuditLog(ro.roId, [{ field: 'Repair Description', oldValue, newValue }]);
+
+                    console.log('✓ Repair Description updated in Supabase');
+                    renderBoard();
                     return;
                 }
 
-                // Build new value
-                let updatedValue;
-                const timestamp = new Date().toLocaleString('en-US', { 
-                    month: '2-digit', 
-                    day: '2-digit', 
-                    year: '2-digit',
-                    hour: '2-digit', 
-                    minute: '2-digit'
+                // ── STATUS NOTES & COMM NOTES — append-only with timestamp ──
+                const newUpdate = await showVoiceNotesModal(`Add update to ${field.name}:`);
+                if (newUpdate === null || newUpdate.trim() === '') return;
+
+                const timestamp = new Date().toLocaleString('en-US', {
+                    month: '2-digit', day: '2-digit', year: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
                 });
-                
                 const userName = currentUser ? currentUser.name : 'Unknown User';
 
+                let updatedValue;
                 if (!decodedValue || decodedValue === '') {
-                    // First entry - just the update with user
                     updatedValue = '[' + timestamp + ' - ' + userName + '] ' + newUpdate.trim();
                 } else {
-                    // Append with separator, timestamp, and user
                     updatedValue = decodedValue + '\n---\n[' + timestamp + ' - ' + userName + '] ' + newUpdate.trim();
                 }
 
-                // Update in currentData
                 currentData[originalIndex][fieldName] = updatedValue;
                 console.log('Updated', fieldName, 'for:', ro.customerName);
 
-                // Write new note to Supabase notes table
                 const noteText = '[' + new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' - ' + (currentUser?.name || 'Unknown') + '] ' + newUpdate.trim();
                 await updateFieldInSupabase(originalIndex, fieldName, noteText);
 
                 console.log('✓ Field updated in Supabase');
-
-                // Refresh the board
                 renderBoard();
 
             } catch (error) {
@@ -5893,7 +5896,7 @@ Notes: ${notes}` : '',
 
         // Initialize
         function init() {
-            console.log('📦 PRVS Dashboard v1.269 - Released 2026-03-20');
+            console.log('📦 PRVS Dashboard v1.270 - Released 2026-03-20');
 
             // Auto-fill saved Anthropic API key into both scan inputs
             const savedAnthropicKey = localStorage.getItem('prvs_anthropic_key');
@@ -8348,7 +8351,7 @@ Notes: ${notes}` : '',
         }
         
         // Voice-enabled notes modal
-        function showVoiceNotesModal(title) {
+        function showVoiceNotesModal(title, prefillValue = '') {
             return new Promise((resolve) => {
                 const modalHTML = `
                     <div id="voiceNotesModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;">
@@ -8372,10 +8375,16 @@ Notes: ${notes}` : '',
                         </div>
                     </div>
                 `;
-                
+
                 document.body.insertAdjacentHTML('beforeend', modalHTML);
-                document.getElementById('voiceNotesInput').focus();
-                
+                const inputEl = document.getElementById('voiceNotesInput');
+                // Pre-fill with existing content if provided (e.g. editing repairDescription)
+                if (prefillValue) {
+                    inputEl.value = prefillValue;
+                    inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
+                }
+                inputEl.focus();
+
                 // Store resolve function globally
                 window.voiceNotesResolve = resolve;
             });
