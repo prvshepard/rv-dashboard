@@ -1,11 +1,39 @@
 # PRVS Dashboard — Claude Context Document
 
-> **Living document.** Update this file at the end of every session.  
-> Any Claude interface can start a session by reading this file via GitHub MCP.
+> **This is Claude's memory across sessions.** Claude has no memory between sessions.
+> Every session MUST start by reading this file. Every session MUST update this file before ending.
 
 ---
 
-## Project Identity
+## ⚡ SESSION PROTOCOL — READ THIS FIRST
+
+### 🟢 START OF SESSION CHECKLIST
+Claude must complete all of these before doing any work:
+
+- [ ] 1. Read this entire file top to bottom
+- [ ] 2. Confirm the current `index.html` version matches the File Inventory table below
+- [ ] 3. Read and acknowledge the **Active TODO List** section aloud to Roland
+- [ ] 4. Ask Roland: *"Is there anything new to add or change from the TODO list before we start?"*
+- [ ] 5. Only then begin work — starting with the highest-priority TODO item unless Roland redirects
+
+### 🔴 END OF SESSION CHECKLIST
+Claude must complete ALL of these before the session ends (context limit, user stops, etc.):
+
+- [ ] 1. Update the **Active TODO List** — mark completed items ✅, add any new items discovered
+- [ ] 2. Update the **File Inventory** table with new version numbers
+- [ ] 3. Add a row to the **Session Log** table
+- [ ] 4. Add new items to **Completed Work**
+- [ ] 5. Update the **Version History** table if version was bumped
+- [ ] 6. Add any new bugs, gotchas, or design decisions to the **Known Issues & Gotchas** section
+- [ ] 7. Commit and push CLAUDE_CONTEXT.md to GitHub
+
+> ⚠️ If the session is about to end due to context limits, Claude should say:
+> *"Context is getting full — let me update CLAUDE_CONTEXT.md before we lose this session."*
+> and complete the End of Session Checklist before anything else.
+
+---
+
+## 🗂 Project Identity
 
 | Field | Value |
 |---|---|
@@ -14,189 +42,198 @@
 | **GitHub Org** | PatriotsRV |
 | **Repo** | rv-dashboard |
 | **Branch** | main |
-| **Deployment** | GitHub Pages (https://patriotsrv.github.io/rv-dashboard/) |
+| **Deployment** | GitHub Pages — https://patriotsrv.github.io/rv-dashboard/ |
+| **Supabase Project Ref** | axfejhudchdejoiwaetq |
 
 ---
 
-## File Inventory
+## 📋 ACTIVE TODO LIST
+
+> This is the canonical task list. Update it every session. Priorities: 🔴 Blocking · 🟠 High · 🟡 Medium · 🔵 Low
+
+| Priority | # | Task | Notes | Status |
+|---|---|---|---|---|
+| 🔴 | GH#1 | **Start Twilio number port** | Port existing number — blocks all SMS features | ⏳ Open |
+| 🟠 | GH#4 | **Twilio SMS v1.27** | Customer + tech notifications via SMS | ⏳ Open |
+| 🟠 | GH#5 | **Work Assignment System** | Assign ROs to specific technicians | ⏳ Open |
+| 🟠 | GH#6 | **Employee Time Clock** | Full time clock feature in dashboard | ⏳ Open |
+| 🟡 | GH#2 | **Regular view layout customization** | Drag/resize tiles | ⏳ Open |
+| 🟡 | GH#3 | **Parts field layout review** | UX improvements to parts section | ⏳ Open |
+| 🟡 | GH#8 | **Switchblade tile view** | Compact tile layout mode | ⏳ Open |
+| 🟠 | — | **Deploy roof-lookup Edge Function** | `supabase functions deploy roof-lookup` — solar.html AI lookup returns 404 until done | ⏳ Pending CLI access |
+| 🟡 | — | **Test calendar re-auth on iPhone** | Full mobile OAuth round-trip flow — confirm Schedule modal reopens after auth | ⏳ Needs field test |
+| 🟡 | — | **GitHub Release v1.265** | Tag exists on main; Roland creates manually at github.com/PatriotsRV/rv-dashboard/releases/new | ⏳ Roland action |
+| 🟡 | — | **GitHub Release v1.266** | Create release notes page on GitHub | ⏳ Roland action |
+
+---
+
+## 📁 File Inventory
 
 | File | Version | Description |
 |---|---|---|
-| `index.html` | **v1.266** | Main dashboard — repair orders, time tracking, parts, etc. |
+| `index.html` | **v1.266** | Main dashboard — ROs, time tracking, parts, calendar, audit log |
 | `checkin.html` | **v1.26** | Technician clock-in/out, offline-first IndexedDB queue |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
 | `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup, PDF quotes |
-| `supabase/functions/roof-lookup/index.ts` | **v1.0** | Edge Function proxy for Anthropic API calls (⚠️ requires deployment — see below) |
-| `supabase/functions/send-quote-email/index.ts` | **v1.1** | Email Edge Function — nodemailer, PDF attachment support |
-| `README.md` | — | Basic repo readme |
-| `CLAUDE_CONTEXT.md` | — | This file — session continuity doc |
+| `supabase/functions/roof-lookup/index.ts` | **v1.0** | Edge Function — Anthropic API proxy for AI roof lookup (⚠️ needs CLI deploy) |
+| `supabase/functions/send-quote-email/index.ts` | **v1.1** | Edge Function — email w/ PDF attachment via nodemailer |
+| `CLAUDE_CONTEXT.md` | — | This file — session continuity |
+| `SESSION_STARTER.md` | — | Copyable session kickoff prompt for Roland to paste into Claude |
 | `RELEASE_NOTES_v1.265.md` | — | Release notes for v1.265 |
 | `RELEASE_NOTES_v1.266.md` | — | Release notes for v1.266 |
 | `.github/workflows/backup.yml` | — | Daily Supabase backup → private backup repo |
 
 ---
 
-## Tech Stack
+## ⚠️ Known Issues & Gotchas
 
-- **Frontend:** Vanilla JS (index/checkin/analytics); React 18.2.0 via CDN (solar.html v2.0)
-- **Auth:** Google Identity Services (GIS) — `signInWithIdToken` via Supabase
+> Things Claude MUST know going into any session. Add new discoveries here.
+
+### Auth Architecture — CRITICAL to understand
+- **`accessToken`** = Google OAuth token. Expires ~1 hour. ONLY needed for Google Drive / Google Calendar API calls. **Never use `!accessToken` as a guard for Supabase operations.**
+- **`getSB()`** = Supabase client. Always available if user is logged in. Use `!getSB()` as the guard for all database/storage operations.
+- **`supabaseSession`** = global holding the active Supabase session. Source of truth for auth state. Kept in sync via `onAuthStateChange` listener (`initSupabaseAuthListener()`).
+- **Persistent sessions** — `persistSession: true`, `autoRefreshToken: true`, `storageKey: 'prvs_supabase_auth'`. Sessions last 30 days. Users must re-login once after v1.265 due to storageKey change.
+
+### Nonce Flow (Google Sign-In → Supabase)
+- Raw nonce = 16 random bytes as **hex string**
+- Hashed nonce = SHA-256 of raw nonce, also **hex string** (NOT base64 — base64 was the v1.263 bug)
+- `hashedNonce` goes as top-level `nonce:` in `google.accounts.id.initialize()` AND as `params: { nonce: hashedNonce }` (Chrome 145 compat)
+- Both nonces stored in localStorage to survive async gaps
+
+### Supabase `.single()` vs `.maybeSingle()`
+- `.single()` throws a 406 error when zero rows are found
+- Always use `.maybeSingle()` when 0 rows is a valid result (e.g., `getUserRole()`, any optional lookup)
+
+### Audit Log — `writeAuditLog(roId, changes)`
+- Signature: `writeAuditLog(roId, [{ field, oldValue, newValue }])`
+- `roId` = PRVS string ID (e.g. "CUS-RV-2025-01-15"), NOT the Supabase UUID
+- Function internally looks up the Supabase UUID via `currentData.find(d => d.roId === roId)`
+- Include `user_id: supabaseSession?.user?.id` — this is already in the function, do NOT add it in callers
+- **oldValue timing trap:** callers must pass oldValue BEFORE mutating `currentData`. If `currentData[i].field = newValue` is done before calling `writeAuditLog`, the old value is lost.
+
+### Photo Migration (Drive → Supabase Storage)
+- `photoJobs.push({ roId: ro.id, ... })` — `ro.id` IS the Supabase UUID (primary key)
+- `ro.ro_id` is the PRVS string ID — do NOT confuse these
+- The `.eq('id', job.roId)` calls are correct
+
+### Calendar Scheduling Re-Auth
+- `_pendingScheduleIndex` global stores the filtered-data index across the OAuth round-trip
+- `reauthorizeCalendar(filteredIndex)` uses `prompt:'consent'` to force interactive popup
+- After successful OAuth, `initSupabaseAuthListener()` in tokenClient callback re-opens the modal
+
+### GitHub Push
+- `gh` CLI is NOT available in the sandbox; use `git` directly from `/sessions/.../mnt/rv-dashboard/`
+- The workspace folder IS the git repo — `git push origin main` works directly
+
+---
+
+## 🏗 Tech Stack
+
+- **Frontend:** Vanilla JS (index/checkin/analytics); React 18.2.0 via CDN (solar.html)
+- **Auth:** Google Identity Services (GIS) → Supabase `signInWithIdToken`
 - **Database:** Supabase (PostgreSQL + RLS)
 - **Storage:** Supabase Storage (`rv-media` bucket)
-- **Backups:** GitHub Actions → `prvshepard/rv-dashboard-backups` (private), daily at 4 AM EST
-- **SMS:** Twilio (planned — port in progress)
+- **Backups:** GitHub Actions → `prvshepard/rv-dashboard-backups` (private), daily 4 AM EST
+- **SMS:** Twilio (planned — number port in progress)
 - **Offline:** IndexedDB queue in checkin.html
 - **Hosting:** GitHub Pages
 
 ---
 
-## Key Architecture Decisions
+## 🗄 Supabase Tables
 
-### Google OAuth + Supabase Nonce Flow (v1.263 — CORRECT)
-Supabase `signInWithIdToken` requires a nonce to prevent replay attacks. The correct pattern:
-
-1. Generate a raw nonce as a **hex string** (16 random bytes, hex-encoded)
-2. Compute SHA-256 of the raw nonce, also encoded as **hex string** — this is `hashedNonce`
-3. Pass `hashedNonce` as top-level `nonce` in `google.accounts.id.initialize()`
-4. Store both nonces in `localStorage('prvs_sb_nonce')` / `localStorage('prvs_sb_nonce_hash')` — survives async callback gaps
-5. In the callback, retrieve raw nonce from localStorage and pass to `supabase.auth.signInWithIdToken()`
-6. Clear nonces from localStorage after success or failure
-
-**v1.263 fix:** `hashedNonce` was encoded with `btoa()` (base64) but Supabase expects **hex** SHA-256.  
-**v1.262 fix:** `nonce` must be top-level in `google.accounts.id.initialize()`, NOT nested under `params`.
-
-### Supabase RBAC
-- RLS enabled on all 11 tables: `repair_orders`, `notes`, `parts`, `time_logs`, `cashiered`, `users`, `user_roles`, `roles`, `audit_log`, `config`, `insurance_scans`
-- Storage bucket `rv-media` also protected
-- Helper function `has_role(role_name text)` — SECURITY DEFINER, checks `user_roles` + `roles` tables
-- Pattern: `TO authenticated USING (true)` for reads; `WITH CHECK (has_role('Admin'))` for restricted writes
-- **Status: ✅ Complete**
-
-### Supabase Edge Function — roof-lookup (⚠️ Deployment Required)
-solar.html v2.0 calls `https://axfejhudchdejoiwaetq.supabase.co/functions/v1/roof-lookup` for AI roof dimension lookup.
-
-The function file is committed at `supabase/functions/roof-lookup/index.ts` but **must be deployed to Supabase** to work:
-
-```bash
-# 1. Install Supabase CLI if not already (https://supabase.com/docs/guides/cli)
-npm install -g supabase
-
-# 2. Login and link project
-supabase login
-supabase link --project-ref axfejhudchdejoiwaetq
-
-# 3. Set your Anthropic API key as a secret (one-time)
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-
-# 4. Deploy the function
-supabase functions deploy roof-lookup
-```
-
-The AI roof lookup in solar.html will 404 until step 4 is done. Everything else in solar.html works without it.
+| Table | Purpose |
+|---|---|
+| `repair_orders` | Core RO data |
+| `notes` | Append-only RO notes (type: `ro_status`, `customer_comm`) |
+| `parts` | Parts per RO |
+| `time_logs` | Technician time entries |
+| `cashiered` | Cashiered/closed RO archive |
+| `users` | User profiles |
+| `user_roles` | User ↔ role join table |
+| `roles` | Role definitions (Admin, Tech, Service Advisor, etc.) |
+| `audit_log` | Field-level change audit trail |
+| `config` | App configuration key/value store |
+| `insurance_scans` | Insurance document scan data |
 
 ---
 
+## 🏛 Key Architecture Decisions
+
+### Supabase RBAC
+- RLS enabled on all 11 tables + storage bucket `rv-media`
+- Helper function `has_role(role_name text)` — SECURITY DEFINER
+- Pattern: `TO authenticated USING (true)` for reads; `WITH CHECK (has_role('Admin'))` for restricted writes
+- **Status: ✅ Complete**
+
+### Supabase Edge Function — roof-lookup
+solar.html v2.0 calls `https://axfejhudchdejoiwaetq.supabase.co/functions/v1/roof-lookup` for AI roof dimension lookup. Code is committed but **must be deployed via CLI**:
+
+```bash
+npm install -g supabase
+supabase login
+supabase link --project-ref axfejhudchdejoiwaetq
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+supabase functions deploy roof-lookup
+```
+
 ### Daily Backup
-- GitHub Actions workflow: `.github/workflows/backup.yml`
-- Schedule: 8 AM UTC (4 AM EST) daily + manual trigger available
+- `.github/workflows/backup.yml` — 8 AM UTC (4 AM EST) daily + manual trigger
 - Exports all 11 tables via Supabase REST API (service role key)
-- Pushes JSON files to private repo `prvshepard/rv-dashboard-backups`
-- Rolling 30-day retention — oldest auto-deleted
-- Required GitHub secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GH_BACKUP_PAT`
+- Pushes to private repo `prvshepard/rv-dashboard-backups`, rolling 30-day retention
+- Required secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GH_BACKUP_PAT`
 - **Status: ✅ Live and tested**
 
 ---
 
-## Supabase Tables
-
-| Table | Purpose |
-|---|---|
-| `repair_orders` | Core RO tracking |
-| `notes` | RO notes |
-| `parts` | Parts per RO |
-| `time_logs` | Technician time entries |
-| `cashiered` | Payment/cashier records |
-| `users` | User profiles |
-| `user_roles` | User ↔ role join |
-| `roles` | Role definitions (Admin, Tech, Service Advisor, etc.) |
-| `audit_log` | Change audit trail |
-| `config` | App configuration |
-| `insurance_scans` | Insurance document scans |
-
----
-
-## Open TODOs (GitHub Issues)
-
-| # | Title | Priority | Notes |
-|---|---|---|---|
-| [#1](https://github.com/PatriotsRV/rv-dashboard/issues/1) | Start Twilio number port | 🔴 Urgent/Blocking | Port existing number — blocks SMS feature |
-| [#2](https://github.com/PatriotsRV/rv-dashboard/issues/2) | Regular view layout customization | Medium | Drag/resize tiles |
-| [#3](https://github.com/PatriotsRV/rv-dashboard/issues/3) | Parts field layout review | Medium | UX improvements |
-| [#4](https://github.com/PatriotsRV/rv-dashboard/issues/4) | Twilio SMS v1.27 | High | Customer/tech notifications |
-| [#5](https://github.com/PatriotsRV/rv-dashboard/issues/5) | Work Assignment System | High | Assign ROs to techs |
-| [#6](https://github.com/PatriotsRV/rv-dashboard/issues/6) | Employee Time Clock | High | Full time clock feature |
-| [#7](https://github.com/PatriotsRV/rv-dashboard/issues/7) | Rotate GitHub PAT | ✅ Done | New PAT created with repo+workflow scopes |
-| [#8](https://github.com/PatriotsRV/rv-dashboard/issues/8) | Switchblade tile view | Medium | Compact tile layout mode |
-
----
-
-## Version History
-
-| Version | Date | Change |
-|---|---|---|
-| v1.0 | Early 2025 | Initial dashboard (Google Sheets backend) |
-| v1.1 | — | Supabase migration begins |
-| v1.26 | 2026-03 | checkin.html — Supabase backend, IndexedDB offline queue, auto clock-out |
-| v1.261 | 2026-03 | index.html — various fixes (pre-nonce-fix) |
-| v1.262 | 2026-03-19 | index.html — Fix nonce placement: top-level in `google.accounts.id.initialize` |
-| v1.263 | 2026-03-19 | index.html — Fix nonce encoding: hex not base64; localStorage persistence |
-| **v1.264** | **2026-03-19** | **index.html — Add Analytics button (Admin only, dark green); version tags on all files** |
-| **solar v2.0** | **2026-03-19** | **solar.html rebuilt by tech — React 18, roof planner, AI lookup (fixed via Edge Function)** |
-| **v1.265** | **2026-03-20** | **index.html — RO description bug fixes (4); mobile filter cutoff fix; calendar re-auth flow. solar.html — 2-page branded PDF quote generation + email attachment. send-quote-email Edge Function — PDF attachment via nodemailer.** |
-| **v1.266** | **2026-03-20** | **index.html — Error handling + audit logging: updateFieldInSupabase, updateROStatus, updateROUrgency, updateROProgress, updatePhotoInSupabase. Comprehensive write-function audit completed.** |
-
----
-
-## Completed Work
+## ✅ Completed Work
 
 - ✅ **Supabase RBAC** — RLS on all 11 tables + storage, `has_role()` helper
 - ✅ **checkin.html v1.26** — Supabase backend, offline-first IndexedDB queue
-- ✅ **Nonce fixes (v1.262, v1.263)** — placement + hex encoding, Supabase auth working
+- ✅ **Nonce fixes (v1.262, v1.263)** — placement + hex encoding; Supabase auth working
 - ✅ **Analytics button (v1.264)** — Admin-only, dark green, tile view header
-- ✅ **Version tags** — Visible version on all 4 HTML files
-- ✅ **Daily backup** — GitHub Actions, private repo, 30-day rolling, tested ✅
-- ✅ **GitHub PAT rotated** — New PAT with `repo` + `workflow` scopes
-- ✅ **CLAUDE_CONTEXT.md** — Cross-session continuity established
-- ✅ **solar.html v2.0** — Deployed; AI calls fixed via Supabase Edge Function (⚠️ Edge Function still needs `supabase functions deploy roof-lookup` to activate)
-- ✅ **roof-lookup Edge Function** — Code committed to `supabase/functions/roof-lookup/index.ts`, awaiting CLI deploy
-- ✅ **PDF quote generation (solar.html)** — 2-page branded PDF via jsPDF + jspdf-autotable; logo, items table, totals, footer, assumptions, notes, terms, signature/deposit block
-- ✅ **Email PDF attachment** — send-quote-email Edge Function updated; PDF attached via nodemailer; email body simplified to "see attached"
-- ✅ **RO Description fixes (index.html v1.265)** — 4 bugs fixed: inline edit connection check, fieldMap entry, updateROInSupabase NULL fallback, description textarea added to Edit RO modal
-- ✅ **Mobile filter cutoff fix** — `.filter-collapsible.open` max-height 300px → 600px; all 10 status buttons visible on iPhone
-- ✅ **Calendar re-auth flow** — `reauthorizeCalendar()` function; `prompt:'consent'` forces interactive OAuth; `_pendingScheduleIndex` round-trip; modal auto-reopens after successful re-auth
-- ✅ **Supabase persistent auth (v1.265+)** — `persistSession: true`, `autoRefreshToken: true`, `storageKey: 'prvs_supabase_auth'`, `onAuthStateChange` listener keeps `supabaseSession` in sync; 30-day sessions
-- ✅ **`!accessToken` guard fixes** — 5 functions changed from `!accessToken` to `!getSB()`: `uploadPhoto`, `updateROStatus`, `updateROUrgency`, `updateROProgress`, New RO form submit
-- ✅ **Audit log user_id fix** — duplicate `writeAuditLog` function removed; surviving function now includes `user_id: supabaseSession?.user?.id`
-- ✅ **Chrome 145 nonce fix** — `params: { nonce: sbHashedNonce }` added alongside top-level nonce
-- ✅ **Supabase users 406 fix** — `getUserRole()` changed from `.single()` to `.maybeSingle()`
-- ✅ **Write function hardening (v1.266)** — Error handling + audit log added to `updateFieldInSupabase`, `updateROStatus`, `updateROUrgency`, `updateROProgress`, `updatePhotoInSupabase`; all Supabase errors now propagate instead of being swallowed silently
+- ✅ **Version tags** — Visible version badge on all 4 HTML files
+- ✅ **Daily backup** — GitHub Actions, private repo, 30-day rolling, tested
+- ✅ **GitHub PAT rotated** — `repo` + `workflow` scopes
+- ✅ **solar.html v2.0** — React 18, roof planner, AI lookup via Edge Function proxy, PDF quote
+- ✅ **PDF quote generation (solar.html)** — 2-page branded PDF via jsPDF + jspdf-autotable
+- ✅ **Email PDF attachment** — send-quote-email Edge Function; PDF via nodemailer
+- ✅ **RO Description fixes (v1.265, ×4)** — inline edit guard, fieldMap, NULL fallback, Edit modal textarea
+- ✅ **Mobile filter cutoff fix** — `.filter-collapsible.open` max-height 300→600px
+- ✅ **Calendar re-auth flow** — `reauthorizeCalendar()`, `prompt:'consent'`, `_pendingScheduleIndex` round-trip
+- ✅ **Persistent Supabase auth** — `persistSession`, `autoRefreshToken`, `storageKey`, `onAuthStateChange`; 30-day sessions
+- ✅ **`!accessToken` guard fixes** — 5 functions corrected to use `!getSB()`
+- ✅ **Audit log user_id fix** — duplicate function removed; `user_id: supabaseSession?.user?.id` added
+- ✅ **Chrome 145 nonce fix** — `params: { nonce: sbHashedNonce }` added
+- ✅ **Supabase users 406 fix** — `getUserRole()` `.single()` → `.maybeSingle()`
+- ✅ **Write function hardening (v1.266)** — Error handling + audit log: `updateFieldInSupabase`, `updateROStatus`, `updateROUrgency`, `updateROProgress`, `updatePhotoInSupabase`
 
 ---
 
-## Session Log
+## 📜 Version History
 
-| Date | Summary |
-|---|---|
-| 2026-03-19 (session 1) | GitHub MCP confirmed, RBAC SQL, checkin.html v1.26, nonce fixes v1.262+v1.263, CLAUDE_CONTEXT.md created |
-| 2026-03-19 (session 2) | Nonce encoding fixed (hex), Analytics button added (v1.264), version tags on all files, daily backup workflow live, PAT rotated |
-| 2026-03-19 (session 3) | solar.html v2.0 deployed (fixed 2 broken Anthropic API calls via Edge Function proxy), roof-lookup Edge Function committed (needs CLI deploy) |
-| 2026-03-20 (session 4) | v1.265 — PDF quote (2-page jsPDF, email attachment), 4× RO description fixes, mobile filter cutoff fix, calendar re-auth flow fully wired |
-| 2026-03-20 (session 5) | v1.265 continued — persistent Supabase auth (30-day), 5× `!accessToken` guard fixes, audit log user_id fix, Chrome 145 nonce, Supabase 406 fix. v1.266 — comprehensive write-function audit; error handling + audit log added to 5 write functions |
+| Version | Date | Summary |
+|---|---|---|
+| v1.0 | Early 2025 | Initial dashboard (Google Sheets backend) |
+| v1.1 | — | Supabase migration begins |
+| v1.26 | 2026-03 | checkin.html — Supabase backend, IndexedDB offline queue |
+| v1.262 | 2026-03-19 | Fix nonce placement in `google.accounts.id.initialize` |
+| v1.263 | 2026-03-19 | Fix nonce encoding (hex not base64); localStorage persistence |
+| v1.264 | 2026-03-19 | Analytics button (Admin only); version badges on all files |
+| solar v2.0 | 2026-03-19 | solar.html rebuilt — React 18, roof planner, AI lookup, PDF quote |
+| v1.265 | 2026-03-20 | 4× RO description fixes; mobile filter fix; calendar re-auth; persistent auth; 406 fix; audit log fix |
+| v1.266 | 2026-03-20 | Write function hardening — error handling + audit log on 5 functions |
 
 ---
 
-## How to Start a New Session
+## 📅 Session Log
 
-1. Read this file via GitHub MCP: `get_file_contents PatriotsRV/rv-dashboard CLAUDE_CONTEXT.md`
-2. Check open issues: `list_issues PatriotsRV/rv-dashboard state=open`
-3. Pick up from the TODO list above
-4. At end of session: update this file + close/update any relevant issues
+| Date | Session | Summary |
+|---|---|---|
+| 2026-03-19 | 1 | GitHub MCP, RBAC SQL, checkin.html v1.26, nonce fixes v1.262+v1.263, CLAUDE_CONTEXT.md created |
+| 2026-03-19 | 2 | Nonce encoding fixed (hex), Analytics button (v1.264), version badges, daily backup live, PAT rotated |
+| 2026-03-19 | 3 | solar.html v2.0 deployed, roof-lookup Edge Function committed (needs CLI deploy) |
+| 2026-03-20 | 4 | v1.265 — PDF quote (jsPDF), email attachment, 4× description fixes, mobile filter, calendar re-auth |
+| 2026-03-20 | 5 | v1.265 cont. — persistent auth, 5× guard fixes, audit log fix, Chrome 145, 406 fix. v1.266 — write hardening |
+| 2026-03-20 | 6 | CLAUDE_CONTEXT.md restructured with TODO list, Session Protocol, Known Issues, SESSION_STARTER.md created |
