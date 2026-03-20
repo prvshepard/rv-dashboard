@@ -22,13 +22,15 @@
 
 | File | Version | Description |
 |---|---|---|
-| `index.html` | **v1.264** | Main dashboard — repair orders, time tracking, parts, etc. |
+| `index.html` | **v1.265** | Main dashboard — repair orders, time tracking, parts, etc. |
 | `checkin.html` | **v1.26** | Technician clock-in/out, offline-first IndexedDB queue |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
-| `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup |
+| `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup, PDF quotes |
 | `supabase/functions/roof-lookup/index.ts` | **v1.0** | Edge Function proxy for Anthropic API calls (⚠️ requires deployment — see below) |
+| `supabase/functions/send-quote-email/index.ts` | **v1.1** | Email Edge Function — nodemailer, PDF attachment support |
 | `README.md` | — | Basic repo readme |
 | `CLAUDE_CONTEXT.md` | — | This file — session continuity doc |
+| `RELEASE_NOTES_v1.265.md` | — | Release notes for v1.265 |
 | `.github/workflows/backup.yml` | — | Daily Supabase backup → private backup repo |
 
 ---
@@ -148,6 +150,7 @@ The AI roof lookup in solar.html will 404 until step 4 is done. Everything else 
 | v1.263 | 2026-03-19 | index.html — Fix nonce encoding: hex not base64; localStorage persistence |
 | **v1.264** | **2026-03-19** | **index.html — Add Analytics button (Admin only, dark green); version tags on all files** |
 | **solar v2.0** | **2026-03-19** | **solar.html rebuilt by tech — React 18, roof planner, AI lookup (fixed via Edge Function)** |
+| **v1.265** | **2026-03-20** | **index.html — RO description bug fixes (4); mobile filter cutoff fix; calendar re-auth flow. solar.html — 2-page branded PDF quote generation + email attachment. send-quote-email Edge Function — PDF attachment via nodemailer.** |
 
 ---
 
@@ -163,6 +166,11 @@ The AI roof lookup in solar.html will 404 until step 4 is done. Everything else 
 - ✅ **CLAUDE_CONTEXT.md** — Cross-session continuity established
 - ✅ **solar.html v2.0** — Deployed; AI calls fixed via Supabase Edge Function (⚠️ Edge Function still needs `supabase functions deploy roof-lookup` to activate)
 - ✅ **roof-lookup Edge Function** — Code committed to `supabase/functions/roof-lookup/index.ts`, awaiting CLI deploy
+- ✅ **PDF quote generation (solar.html)** — 2-page branded PDF via jsPDF + jspdf-autotable; logo, items table, totals, footer, assumptions, notes, terms, signature/deposit block
+- ✅ **Email PDF attachment** — send-quote-email Edge Function updated; PDF attached via nodemailer; email body simplified to "see attached"
+- ✅ **RO Description fixes (index.html v1.265)** — 4 bugs fixed: inline edit connection check, fieldMap entry, updateROInSupabase NULL fallback, description textarea added to Edit RO modal
+- ✅ **Mobile filter cutoff fix** — `.filter-collapsible.open` max-height 300px → 600px; all 10 status buttons visible on iPhone
+- ✅ **Calendar re-auth flow** — `reauthorizeCalendar()` function; `prompt:'consent'` forces interactive OAuth; `_pendingScheduleIndex` round-trip; modal auto-reopens after successful re-auth
 
 ---
 
@@ -173,6 +181,7 @@ The AI roof lookup in solar.html will 404 until step 4 is done. Everything else 
 | 2026-03-19 (session 1) | GitHub MCP confirmed, RBAC SQL, checkin.html v1.26, nonce fixes v1.262+v1.263, CLAUDE_CONTEXT.md created |
 | 2026-03-19 (session 2) | Nonce encoding fixed (hex), Analytics button added (v1.264), version tags on all files, daily backup workflow live, PAT rotated |
 | 2026-03-19 (session 3) | solar.html v2.0 deployed (fixed 2 broken Anthropic API calls via Edge Function proxy), roof-lookup Edge Function committed (needs CLI deploy) |
+| 2026-03-20 (session 4) | v1.265 — PDF quote (2-page jsPDF, email attachment), 4× RO description fixes, mobile filter cutoff fix, calendar re-auth flow fully wired |
 
 ---
 
