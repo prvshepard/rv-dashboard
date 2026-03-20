@@ -4874,6 +4874,19 @@ Always prefer mapping to a standard key over creating a new one.`;
         // GOOGLE CALENDAR SCHEDULING
         // ══════════════════════════════════════════════════════════════
 
+        function reauthorizeCalendar(filteredIndex) {
+            _pendingScheduleIndex = filteredIndex;
+            const warningEl = document.getElementById('schedCalendarWarning');
+            if (warningEl) warningEl.innerHTML = '⏳ Opening Google authorization…';
+            try {
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            } catch(e) {
+                console.error('reauthorizeCalendar error:', e);
+                if (warningEl) warningEl.innerHTML = '❌ Could not open Google authorization. Try refreshing the page.';
+                _pendingScheduleIndex = null;
+            }
+        }
+
         async function openScheduleModal(filteredIndex) {
             const ro = currentFilteredData[filteredIndex];
             if (!ro) return;
@@ -4900,9 +4913,11 @@ Always prefer mapping to a standard key over creating a new one.`;
                         <h2 style="color:#e8eaed;font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;margin-bottom:4px;">📅 Schedule RO</h2>
                         <p style="color:#6b7280;font-size:0.9rem;margin-bottom:20px;">${ro.customerName} — ${ro.rv || '—'}</p>
 
-                        ${!accessToken ? `<div style="background:#fef3c7;color:#92400e;padding:12px 14px;border-radius:8px;margin-bottom:16px;font-size:0.85rem;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-                            <span>⚠️ Google Calendar access has expired. Re-authorize to create events.</span>
-                            <button onclick="tokenClient.requestAccessToken({prompt:''})" style="padding:6px 14px;background:#92400e;color:white;border:none;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;white-space:nowrap;">Re-authorize</button>
+                        ${!accessToken ? `<div style="background:#fef3c7;color:#92400e;padding:12px 14px;border-radius:8px;margin-bottom:16px;font-size:0.85rem;">
+                            <span id="schedCalendarWarning">⚠️ Google Calendar access has expired. Re-authorize to create events.</span>
+                            <div style="margin-top:10px;">
+                                <button onclick="reauthorizeCalendar(${filteredIndex})" style="padding:8px 18px;background:#92400e;color:white;border:none;border-radius:6px;font-size:0.85rem;font-weight:700;cursor:pointer;">Re-authorize Google Calendar</button>
+                            </div>
                         </div>` : ''}
 
                         <div style="margin-bottom:16px;">
@@ -6855,6 +6870,7 @@ Notes: ${notes}` : '',
         var tokenClient;
         var accessToken = null;
         var googleIdToken = null; // id_token for Supabase RBAC
+        var _pendingScheduleIndex = null; // set when re-auth is triggered from within the Schedule modal
         var supabaseNonce = null;  // raw nonce — shared between gisLoaded and tokenClient callback
         var sessionRestoredFromCache = false; // set by loadSavedToken to prevent gisLoaded from re-authing
         var currentUser = null;
@@ -7352,6 +7368,15 @@ Notes: ${notes}` : '',
                     const expiresIn = resp.expires_in || 3600;
                     saveToken(accessToken, expiresIn);
                     setupTokenRefresh();
+
+                    // If re-auth was triggered from inside the Schedule modal, re-open it
+                    if (_pendingScheduleIndex !== null) {
+                        const idx = _pendingScheduleIndex;
+                        _pendingScheduleIndex = null;
+                        closeScheduleModal();
+                        openScheduleModal(idx);
+                        return;
+                    }
 
                     // Only do full load if this is a fresh login (no data yet)
                     if (!initialLoadDone) {
