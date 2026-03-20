@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-    PRVS Dashboard v1.268
+    PRVS Dashboard v1.269
     Released: 2026-03-20
+    v1.269: Parts Request photo attachments — upload to Supabase Storage, add to RO photo_library, embed inline thumbnails in management email
     v1.268: Fix notes_type_check constraint error — use ro_status type + body prefix filter instead of parts_request type
     v1.267: Parts Request System — modal w/ voice dictation, neon-pink pulsing chip, RO Status auto-note, management email, Mark Parts Ordered flow; send-quote-email Edge Function extended for parts_request type
     v1.266: Error handling + audit log for updateFieldInSupabase, updateROStatus, updateROUrgency, updateROProgress, updatePhotoInSupabase; photo migration bug confirmed not an issue
@@ -2467,7 +2468,7 @@
                 <span id="totalRVs">0 RVs on Lot</span>
             </div>
             <div style="text-align: right; margin-top: 8px;">
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.268</span>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.269</span>
             </div>
         </header>
 
@@ -5892,7 +5893,7 @@ Notes: ${notes}` : '',
 
         // Initialize
         function init() {
-            console.log('📦 PRVS Dashboard v1.268 - Released 2026-03-20');
+            console.log('📦 PRVS Dashboard v1.269 - Released 2026-03-20');
 
             // Auto-fill saved Anthropic API key into both scan inputs
             const savedAnthropicKey = localStorage.getItem('prvs_anthropic_key');
@@ -8666,13 +8667,54 @@ Notes: ${notes}` : '',
         // PARTS REQUEST SYSTEM
         // ══════════════════════════════════════════════════════════════
 
+        // Module-level file list — survives the async file-picker callback
+        let _partsRequestFiles = [];
+
+        // Called by the hidden <input type="file"> when user picks photos
+        function previewPartsPhotos(input) {
+            const newFiles = Array.from(input.files || []);
+            _partsRequestFiles = [..._partsRequestFiles, ...newFiles];
+            input.value = ''; // reset so same file can be re-selected if needed
+            renderPartsPhotoPreview();
+        }
+
+        // Remove one photo from the pending list by index
+        function removePartsPhoto(i) {
+            _partsRequestFiles.splice(i, 1);
+            renderPartsPhotoPreview();
+        }
+
+        // Redraw the thumbnail strip inside the modal
+        function renderPartsPhotoPreview() {
+            const strip = document.getElementById('partsPhotoPreview');
+            const countEl = document.getElementById('partsPhotoCount');
+            if (!strip) return;
+            strip.innerHTML = '';
+            _partsRequestFiles.forEach((file, i) => {
+                const url = URL.createObjectURL(file);
+                const wrap = document.createElement('div');
+                wrap.style.cssText = 'position:relative; width:76px; height:76px; flex-shrink:0;';
+                wrap.innerHTML = `
+                    <img src="${url}" style="width:76px; height:76px; object-fit:cover; border-radius:8px; border:1.5px solid var(--border-color);">
+                    <button onclick="removePartsPhoto(${i})"
+                        style="position:absolute; top:-7px; right:-7px; background:#ff3b30; color:white; border:none; border-radius:50%; width:22px; height:22px; font-size:13px; line-height:22px; text-align:center; cursor:pointer; padding:0; font-weight:700;">×</button>
+                `;
+                strip.appendChild(wrap);
+            });
+            strip.style.display = _partsRequestFiles.length ? 'flex' : 'none';
+            if (countEl) countEl.textContent = _partsRequestFiles.length
+                ? `${_partsRequestFiles.length} photo${_partsRequestFiles.length !== 1 ? 's' : ''} attached`
+                : '';
+        }
+
         // Open the parts request submission modal
         function openPartsRequestModal(filteredIndex) {
             if (!getSB()) { alert('Please connect to PRVS database first!'); return; }
             const ro = currentFilteredData[filteredIndex];
             if (!ro) { alert('Error: RO not found.'); return; }
 
-            // Remove any existing modal
+            // Reset photo list and remove any existing modal
+            _partsRequestFiles = [];
             document.getElementById('partsRequestModal')?.remove();
 
             const modal = document.createElement('div');
@@ -8682,31 +8724,49 @@ Notes: ${notes}` : '',
                 <div class="modal-content" style="max-width:520px;">
                     <div class="modal-header">
                         <h2 class="modal-title">🔩 Request Parts</h2>
-                        <button class="modal-close" onclick="document.getElementById('partsRequestModal').remove()">×</button>
+                        <button class="modal-close" onclick="_partsRequestFiles=[]; document.getElementById('partsRequestModal').remove()">×</button>
                     </div>
                     <div style="padding:0 0 14px; color:var(--text-secondary); font-size:0.85rem; border-bottom:1px solid var(--border-color); margin-bottom:16px;">
                         <strong style="color:var(--text-primary); font-size:0.95rem;">${ro.customerName}</strong>
                         &nbsp;·&nbsp; ${ro.rv || 'RV'}
                         ${ro.roId ? `&nbsp;·&nbsp; <span style="font-family:'JetBrains Mono',monospace; color:var(--accent-info); font-size:0.8rem;">${ro.roId}</span>` : ''}
                     </div>
-                    <div style="margin-bottom:14px;">
+
+                    <div style="margin-bottom:12px;">
                         <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:6px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Describe the part(s) needed:</label>
-                        <textarea id="partsRequestText" rows="5"
+                        <textarea id="partsRequestText" rows="4"
                             style="width:100%; background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:8px; color:var(--text-primary); padding:10px; font-size:0.9rem; resize:vertical; box-sizing:border-box; line-height:1.5;"
                             placeholder="e.g. 12V water pump for 2019 Coachmen Freelander, part #WP-12V-001&#10;Also need 3/4&quot; PVC elbow fittings x4"></textarea>
                     </div>
-                    <div style="display:flex; gap:10px; margin-bottom:16px;">
-                        <button onclick="partsRequestDictate()" style="flex:0 0 auto; padding:10px 16px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-tertiary); color:var(--text-primary); cursor:pointer; font-size:0.85rem; font-weight:600;">
+
+                    <div style="display:flex; gap:8px; margin-bottom:12px;">
+                        <button onclick="partsRequestDictate()"
+                            style="flex:1; padding:9px 12px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-tertiary); color:var(--text-primary); cursor:pointer; font-size:0.85rem; font-weight:600;">
                             🎙 Dictate
                         </button>
-                        <button id="partsRequestSubmitBtn" onclick="submitPartsRequest(${filteredIndex})"
-                            style="flex:1; padding:10px; border-radius:8px; border:none; background:linear-gradient(135deg,#FF1493,#c0006e); color:white; font-weight:700; cursor:pointer; font-size:0.9rem; letter-spacing:0.02em;">
-                            📤 Send Parts Request
+                        <button onclick="document.getElementById('partsPhotoInput').click()"
+                            style="flex:1; padding:9px 12px; border-radius:8px; border:1px solid rgba(255,149,0,0.4); background:rgba(255,149,0,0.08); color:#ff9500; cursor:pointer; font-size:0.85rem; font-weight:600;">
+                            📷 Attach / Take Photo(s)
                         </button>
                     </div>
-                    <div style="font-size:0.75rem; color:var(--text-secondary); line-height:1.5;">
-                        Request will be emailed to management, pinned to this RO, and logged in RO Status notes.
-                        The RO card will pulse until parts are marked as ordered.
+
+                    <!-- Hidden file input — accept images, multiple, allow camera on mobile -->
+                    <input type="file" id="partsPhotoInput" accept="image/*" multiple
+                        style="display:none;" onchange="previewPartsPhotos(this)">
+
+                    <!-- Photo thumbnail preview strip -->
+                    <div id="partsPhotoPreview"
+                        style="display:none; flex-wrap:wrap; gap:8px; margin-bottom:12px; padding:10px; background:var(--bg-tertiary); border-radius:8px; border:1px solid var(--border-color);">
+                    </div>
+                    <div id="partsPhotoCount" style="font-size:0.75rem; color:#ff9500; margin-bottom:12px; min-height:1em;"></div>
+
+                    <button id="partsRequestSubmitBtn" onclick="submitPartsRequest(${filteredIndex})"
+                        style="width:100%; padding:12px; border-radius:8px; border:none; background:linear-gradient(135deg,#FF1493,#c0006e); color:white; font-weight:700; cursor:pointer; font-size:0.95rem; letter-spacing:0.02em; margin-bottom:12px;">
+                        📤 Send Parts Request
+                    </button>
+
+                    <div style="font-size:0.75rem; color:var(--text-secondary); line-height:1.6;">
+                        Request + photos will be emailed to management, photos saved to RO library, and the request logged in RO Status notes. The RO card will pulse until parts are marked as ordered.
                     </div>
                 </div>
             `;
@@ -8757,7 +8817,34 @@ Notes: ${notes}` : '',
                 }).eq('id', ro._supabaseId);
                 if (updErr) throw updErr;
 
-                // 4. Email management (non-blocking — failure does not stop the request)
+                // 4. Upload any attached photos → Supabase Storage → add to RO photo_library
+                const photoUrls = [];
+                if (_partsRequestFiles.length > 0) {
+                    if (btn) btn.textContent = `⏳ Uploading ${_partsRequestFiles.length} photo(s)...`;
+                    for (let pi = 0; pi < _partsRequestFiles.length; pi++) {
+                        try {
+                            const pUrl = await uploadToSupabaseStorage(_partsRequestFiles[pi], ro.roId || 'general');
+                            photoUrls.push(pUrl);
+                        } catch(pe) {
+                            console.warn(`Photo ${pi + 1} upload failed (non-blocking):`, pe);
+                        }
+                    }
+                    // Add uploaded URLs to the RO's photo_library
+                    if (photoUrls.length > 0) {
+                        const origIdx = currentData.findIndex(d => d._supabaseId === ro._supabaseId);
+                        if (origIdx !== -1) {
+                            const lib = parseLibrary(currentData[origIdx].photoLibrary || '');
+                            lib.photos = [...lib.photos, ...photoUrls];
+                            const libJson = serializeLibrary(lib);
+                            currentData[origIdx].photoLibrary = libJson;
+                            await updatePhotoLibraryInSheet(libJson, origIdx);
+                        }
+                    }
+                    _partsRequestFiles = []; // clear after upload
+                }
+
+                // 5. Email management (non-blocking — failure does not stop the request)
+                if (btn) btn.textContent = '⏳ Sending email...';
                 try {
                     await fetch(`${SUPABASE_URL}/functions/v1/send-quote-email`, {
                         method: 'POST',
@@ -8776,16 +8863,17 @@ Notes: ${notes}` : '',
                             vin:          ro.vin  || '',
                             timestamp:    new Date().toLocaleString('en-US', { dateStyle:'full', timeStyle:'short' }),
                             description,
+                            photoUrls,
                         }),
                     });
                 } catch(emailErr) {
                     console.warn('Parts request email notification failed (non-blocking):', emailErr);
                 }
 
-                // 5. Audit log
-                await writeAuditLog(ro.roId, [{ field: 'partsRequest', oldValue: '', newValue: `PARTS REQUESTED: ${description}` }]);
+                // 6. Audit log
+                await writeAuditLog(ro.roId, [{ field: 'partsRequest', oldValue: '', newValue: `PARTS REQUESTED: ${description}${photoUrls.length ? ` (+${photoUrls.length} photo(s))` : ''}` }]);
 
-                // 6. Update local data so the card re-renders immediately
+                // 7. Update local data so the card re-renders immediately
                 const origIdx = currentData.findIndex(d => d._supabaseId === ro._supabaseId);
                 if (origIdx !== -1) {
                     currentData[origIdx].hasOpenPartsRequest = true;
@@ -8794,7 +8882,8 @@ Notes: ${notes}` : '',
 
                 document.getElementById('partsRequestModal')?.remove();
                 renderBoard();
-                alert('✅ Parts request sent! Management has been notified and the RO has been flagged.');
+                const photoMsg = photoUrls.length ? ` ${photoUrls.length} photo(s) saved to RO library.` : '';
+                alert(`✅ Parts request sent! Management has been notified and the RO has been flagged.${photoMsg}`);
 
             } catch(err) {
                 console.error('Parts request submission error:', err);

@@ -33,7 +33,8 @@ Deno.serve(async (req: Request) => {
 
     // ── PARTS REQUEST EMAIL ────────────────────────────────────────────
     if (type === "parts_request") {
-      const { to, techName, techEmail, customerName, roId, rv, vin, timestamp, description } = body;
+      const { to, techName, techEmail, customerName, roId, rv, vin, timestamp, description, photoUrls } = body;
+      const photos: string[] = Array.isArray(photoUrls) ? photoUrls : [];
 
       if (!to) {
         return new Response(JSON.stringify({ error: "Missing 'to' address" }), {
@@ -71,6 +72,20 @@ Deno.serve(async (req: Request) => {
     <p style="margin: 0; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${description || "No description provided."}</p>
   </div>
 
+  ${photos.length > 0 ? `
+  <div style="background: #f9f9f9; border-radius: 8px; padding: 16px; margin-bottom: 20px; border-left: 4px solid #ff9500;">
+    <h3 style="margin: 0 0 12px; color: #333; font-size: 15px;">📷 Photos Attached (${photos.length}):</h3>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+      ${photos.map((url, i) => `
+      <a href="${url}" target="_blank" style="display:block; text-decoration:none;">
+        <img src="${url}" width="160" height="120"
+             style="width:160px; height:120px; object-fit:cover; border-radius:6px; border:1.5px solid #ddd; display:block;"
+             alt="Parts photo ${i + 1}">
+        <span style="display:block; text-align:center; font-size:10px; color:#888; margin-top:3px;">Photo ${i + 1}</span>
+      </a>`).join("")}
+    </div>
+  </div>` : ""}
+
   <p style="font-size: 14px; color: #555;">Please order the required parts and mark the request as <strong>Ordered</strong> in the PRVS Dashboard to clear the alert on this RO.</p>
 
   <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #ddd;">
@@ -89,7 +104,7 @@ Deno.serve(async (req: Request) => {
         replyTo: "Patriots RV Services <info@patriotsrvservices.com>",
         to,
         subject,
-        text:    `Parts Request\n\nSubmitted by: ${techName}\nDate/Time: ${timestamp}\nCustomer: ${customerName}\nRO: ${roId}\nVehicle: ${rv}\n\nParts Needed:\n${description}`,
+        text:    `Parts Request\n\nSubmitted by: ${techName}\nDate/Time: ${timestamp}\nCustomer: ${customerName}\nRO: ${roId}\nVehicle: ${rv}\n\nParts Needed:\n${description}${photos.length > 0 ? `\n\nPhotos (${photos.length}):\n${photos.map((u, i) => `  ${i + 1}. ${u}`).join("\n")}` : ""}`,
         html:    htmlBody,
       });
 
