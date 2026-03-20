@@ -22,7 +22,7 @@
 
 | File | Version | Description |
 |---|---|---|
-| `index.html` | **v1.265** | Main dashboard — repair orders, time tracking, parts, etc. |
+| `index.html` | **v1.266** | Main dashboard — repair orders, time tracking, parts, etc. |
 | `checkin.html` | **v1.26** | Technician clock-in/out, offline-first IndexedDB queue |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
 | `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup, PDF quotes |
@@ -31,6 +31,7 @@
 | `README.md` | — | Basic repo readme |
 | `CLAUDE_CONTEXT.md` | — | This file — session continuity doc |
 | `RELEASE_NOTES_v1.265.md` | — | Release notes for v1.265 |
+| `RELEASE_NOTES_v1.266.md` | — | Release notes for v1.266 |
 | `.github/workflows/backup.yml` | — | Daily Supabase backup → private backup repo |
 
 ---
@@ -151,6 +152,7 @@ The AI roof lookup in solar.html will 404 until step 4 is done. Everything else 
 | **v1.264** | **2026-03-19** | **index.html — Add Analytics button (Admin only, dark green); version tags on all files** |
 | **solar v2.0** | **2026-03-19** | **solar.html rebuilt by tech — React 18, roof planner, AI lookup (fixed via Edge Function)** |
 | **v1.265** | **2026-03-20** | **index.html — RO description bug fixes (4); mobile filter cutoff fix; calendar re-auth flow. solar.html — 2-page branded PDF quote generation + email attachment. send-quote-email Edge Function — PDF attachment via nodemailer.** |
+| **v1.266** | **2026-03-20** | **index.html — Error handling + audit logging: updateFieldInSupabase, updateROStatus, updateROUrgency, updateROProgress, updatePhotoInSupabase. Comprehensive write-function audit completed.** |
 
 ---
 
@@ -171,6 +173,12 @@ The AI roof lookup in solar.html will 404 until step 4 is done. Everything else 
 - ✅ **RO Description fixes (index.html v1.265)** — 4 bugs fixed: inline edit connection check, fieldMap entry, updateROInSupabase NULL fallback, description textarea added to Edit RO modal
 - ✅ **Mobile filter cutoff fix** — `.filter-collapsible.open` max-height 300px → 600px; all 10 status buttons visible on iPhone
 - ✅ **Calendar re-auth flow** — `reauthorizeCalendar()` function; `prompt:'consent'` forces interactive OAuth; `_pendingScheduleIndex` round-trip; modal auto-reopens after successful re-auth
+- ✅ **Supabase persistent auth (v1.265+)** — `persistSession: true`, `autoRefreshToken: true`, `storageKey: 'prvs_supabase_auth'`, `onAuthStateChange` listener keeps `supabaseSession` in sync; 30-day sessions
+- ✅ **`!accessToken` guard fixes** — 5 functions changed from `!accessToken` to `!getSB()`: `uploadPhoto`, `updateROStatus`, `updateROUrgency`, `updateROProgress`, New RO form submit
+- ✅ **Audit log user_id fix** — duplicate `writeAuditLog` function removed; surviving function now includes `user_id: supabaseSession?.user?.id`
+- ✅ **Chrome 145 nonce fix** — `params: { nonce: sbHashedNonce }` added alongside top-level nonce
+- ✅ **Supabase users 406 fix** — `getUserRole()` changed from `.single()` to `.maybeSingle()`
+- ✅ **Write function hardening (v1.266)** — Error handling + audit log added to `updateFieldInSupabase`, `updateROStatus`, `updateROUrgency`, `updateROProgress`, `updatePhotoInSupabase`; all Supabase errors now propagate instead of being swallowed silently
 
 ---
 
@@ -182,6 +190,7 @@ The AI roof lookup in solar.html will 404 until step 4 is done. Everything else 
 | 2026-03-19 (session 2) | Nonce encoding fixed (hex), Analytics button added (v1.264), version tags on all files, daily backup workflow live, PAT rotated |
 | 2026-03-19 (session 3) | solar.html v2.0 deployed (fixed 2 broken Anthropic API calls via Edge Function proxy), roof-lookup Edge Function committed (needs CLI deploy) |
 | 2026-03-20 (session 4) | v1.265 — PDF quote (2-page jsPDF, email attachment), 4× RO description fixes, mobile filter cutoff fix, calendar re-auth flow fully wired |
+| 2026-03-20 (session 5) | v1.265 continued — persistent Supabase auth (30-day), 5× `!accessToken` guard fixes, audit log user_id fix, Chrome 145 nonce, Supabase 406 fix. v1.266 — comprehensive write-function audit; error handling + audit log added to 5 write functions |
 
 ---
 

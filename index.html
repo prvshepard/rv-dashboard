@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-    PRVS Dashboard v1.265
+    PRVS Dashboard v1.266
     Released: 2026-03-20
+    v1.266: Error handling + audit log for updateFieldInSupabase, updateROStatus, updateROUrgency, updateROProgress, updatePhotoInSupabase; photo migration bug confirmed not an issue
     v1.265: RO description fixes (4), mobile filter cutoff, calendar re-auth flow, Chrome 145 nonce fix, Supabase users 406 fix
     v1.264: Add Analytics button (Admin only, dark green); version tags on all files
     v1.263: Fix nonce encoding — was base64 (btoa), must be hex for Supabase verification; add localStorage persistence so nonce survives async callback gaps
@@ -2381,7 +2382,7 @@
                 <span id="totalRVs">0 RVs on Lot</span>
             </div>
             <div style="text-align: right; margin-top: 8px;">
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.264</span>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.266</span>
             </div>
         </header>
 
@@ -2993,12 +2994,13 @@
 
                 // Update Supabase
                 await updateFieldInSupabase(originalIndex, 'urgency', newUrgency);
+                await writeAuditLog(ro.roId, [{ field: 'urgency', oldValue: ro.urgency, newValue: newUrgency }]);
                 console.log('✓ Urgency updated in Supabase');
 
                 // Show success feedback
                 dropdown.style.opacity = '1';
                 dropdown.disabled = false;
-                
+
                 // Brief flash to show success
                 dropdown.style.boxShadow = '0 0 0 3px rgba(255, 255, 255, 0.5)';
                 setTimeout(() => {
@@ -3140,6 +3142,7 @@
 
                 // Update Supabase
                 await updateFieldInSupabase(originalIndex, 'percentComplete', newProgress);
+                await writeAuditLog(ro.roId, [{ field: 'percentComplete', oldValue: ro.percentComplete, newValue: newProgress }]);
                 console.log('✓ Progress updated in Supabase');
                 renderBoard();
 
@@ -3212,7 +3215,14 @@
                         updated_at: new Date().toISOString(),
                     };
                     if (autoDateArrived) updatePayload.date_arrived = autoDateArrived;
-                    await getSB().from('repair_orders').update(updatePayload).eq('id', supabaseId);
+                    const { error: statusErr } = await getSB().from('repair_orders').update(updatePayload).eq('id', supabaseId);
+                    if (statusErr) throw statusErr;
+
+                    // Audit log
+                    const auditChanges = [{ field: 'status', oldValue: ro.status, newValue: newStatus }];
+                    if (autoProgress !== ro.percentComplete) auditChanges.push({ field: 'percentComplete', oldValue: ro.percentComplete, newValue: autoProgress });
+                    if (autoDateArrived) auditChanges.push({ field: 'dateArrived', oldValue: '', newValue: autoDateArrived });
+                    await writeAuditLog(ro.roId, auditChanges);
                 }
                 console.log('✓ Status and progress updated in Supabase');
 
@@ -5797,7 +5807,7 @@ Notes: ${notes}` : '',
 
         // Initialize
         function init() {
-            console.log('📦 PRVS Dashboard v1.264 - Released 2026-03-19');
+            console.log('📦 PRVS Dashboard v1.266 - Released 2026-03-20');
 
             // Auto-fill saved Anthropic API key into both scan inputs
             const savedAnthropicKey = localStorage.getItem('prvs_anthropic_key');
@@ -7915,28 +7925,31 @@ Notes: ${notes}` : '',
 
             const dbField = fieldMap[fieldName];
             if (dbField) {
-                await getSB().from('repair_orders').update({
+                const { error: fieldErr } = await getSB().from('repair_orders').update({
                     [dbField]: newValue,
                     updated_at: new Date().toISOString(),
                 }).eq('id', supabaseId);
+                if (fieldErr) throw fieldErr;
             }
 
             // Notes fields go to notes table
             if (fieldName === 'roStatusNotes') {
-                await getSB().from('notes').insert({
+                const { error: notesErr } = await getSB().from('notes').insert({
                     ro_id: supabaseId,
                     type: 'ro_status',
                     body: newValue,
                     created_at: new Date().toISOString(),
                 });
+                if (notesErr) throw notesErr;
             }
             if (fieldName === 'customerCommunicationNotes') {
-                await getSB().from('notes').insert({
+                const { error: commErr } = await getSB().from('notes').insert({
                     ro_id: supabaseId,
                     type: 'customer_comm',
                     body: newValue,
                     created_at: new Date().toISOString(),
                 });
+                if (commErr) throw commErr;
             }
         }
 
@@ -7949,11 +7962,12 @@ Notes: ${notes}` : '',
             let libraryObj = { photos: [], docs: [] };
             try { libraryObj = JSON.parse(libraryJson); } catch(e) {}
 
-            await getSB().from('repair_orders').update({
+            const { error: photoErr } = await getSB().from('repair_orders').update({
                 photo_url:      photoUrl || ro.rvPhotoUrl,
                 photo_library:  libraryObj,
                 updated_at:     new Date().toISOString(),
             }).eq('id', supabaseId);
+            if (photoErr) throw photoErr;
         }
 
         // Archive RO to cashiered table in Supabase
