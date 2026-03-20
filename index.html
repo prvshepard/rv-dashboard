@@ -8009,36 +8009,6 @@ Notes: ${notes}` : '',
             return `Week ${week} ${now.getFullYear()}`;
         }
 
-        // Write audit log entry to Supabase
-        async function writeAuditLog(roId, changedFields) {
-            if (!supabaseSession) return;
-            const email = supabaseSession.user.email;
-            const name = currentUser?.name || email;
-
-            // Find RO _sb ID
-            const { data: roRecord } = await getSB()
-                .from('repair_orders')
-                .select('id')
-                .eq('ro_id', roId)
-                .single();
-
-            if (!roRecord) return;
-
-            // Log each changed field
-            const entries = Object.entries(changedFields).map(([field, value]) => ({
-                ro_id:         roRecord.id,
-                user_email:    email,
-                user_name:     name,
-                field_changed: field,
-                new_value:     String(value),
-                changed_at:    new Date().toISOString(),
-            }));
-
-            if (entries.length > 0) {
-                await getSB().from('audit_log').insert(entries);
-            }
-        }
-
         // Load custom field config from Supabase config table
         async function loadCustomFieldConfigFromSupabase() {
             try {
@@ -8593,6 +8563,7 @@ Notes: ${notes}` : '',
 
                 const rows = changes.map(({ field, oldValue, newValue }) => ({
                     ro_id:         supabaseId || null,
+                    user_id:       supabaseSession?.user?.id || null,
                     user_email:    userEmail,
                     user_name:     userName,
                     field_changed: field,
