@@ -2309,7 +2309,7 @@
             opacity: 0;
         }
         .filter-collapsible.open {
-            max-height: 300px;
+            max-height: 600px;
             opacity: 1;
         }
 
@@ -4900,8 +4900,9 @@ Always prefer mapping to a standard key over creating a new one.`;
                         <h2 style="color:#e8eaed;font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;margin-bottom:4px;">📅 Schedule RO</h2>
                         <p style="color:#6b7280;font-size:0.9rem;margin-bottom:20px;">${ro.customerName} — ${ro.rv || '—'}</p>
 
-                        ${!accessToken ? `<div style="background:#fef3c7;color:#92400e;padding:12px;border-radius:8px;margin-bottom:16px;font-size:0.85rem;">
-                            ⚠️ Connect to PRVS first to enable calendar integration.
+                        ${!accessToken ? `<div style="background:#fef3c7;color:#92400e;padding:12px 14px;border-radius:8px;margin-bottom:16px;font-size:0.85rem;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                            <span>⚠️ Google Calendar access has expired. Re-authorize to create events.</span>
+                            <button onclick="tokenClient.requestAccessToken({prompt:''})" style="padding:6px 14px;background:#92400e;color:white;border:none;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;white-space:nowrap;">Re-authorize</button>
                         </div>` : ''}
 
                         <div style="margin-bottom:16px;">
@@ -4958,7 +4959,7 @@ Always prefer mapping to a standard key over creating a new one.`;
                         <div id="scheduleStatus" style="margin-bottom:12px;font-size:0.85rem;color:#9ca3af;min-height:20px;"></div>
 
                         <div style="display:flex;gap:8px;">
-                            <button id="scheduleConfirmBtn" onclick="confirmSchedule(${filteredIndex})" style="flex:2;padding:12px;background:linear-gradient(135deg,#39ff6e,#10b981);border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;color:#0d0f12;">
+                            <button id="scheduleConfirmBtn" onclick="confirmSchedule(${filteredIndex})" ${!accessToken ? 'disabled title="Re-authorize Google Calendar above first"' : ''} style="flex:2;padding:12px;background:${accessToken ? 'linear-gradient(135deg,#39ff6e,#10b981)' : '#374151'};border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:${accessToken ? 'pointer' : 'not-allowed'};color:${accessToken ? '#0d0f12' : '#6b7280'};">
                                 📅 Schedule
                             </button>
                             <button onclick="closeScheduleModal()" style="flex:1;padding:12px;background:#252930;border:1px solid #2d3139;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;color:#9ca3af;">
