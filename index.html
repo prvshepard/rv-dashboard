@@ -3018,7 +3018,7 @@
 
         // Edit field inline
         async function editField(index, fieldName, currentValue) {
-            if (!accessToken) {
+            if (!getSB()) {
                 alert('Please connect to PRVS database first!');
                 return;
             }
@@ -7819,7 +7819,7 @@ Notes: ${notes}` : '',
                 rv:             formData.rv || null,
                 vin:            formData.vin || null,
                 repair_type:    formData.repairType || null,
-                description:    formData.repairDescription || null,
+                description:    formData.repairDescription !== undefined ? (formData.repairDescription || null) : (ro.repairDescription || null),
                 technician:     formData.technicianAssigned || null,
                 promised_date:  formData.promisedDate || null,
                 dollar_value:   formData.dollarValue ? parseFloat(formData.dollarValue) : null,
@@ -7846,11 +7846,12 @@ Notes: ${notes}` : '',
             if (!supabaseId) return;
 
             const fieldMap = {
-                status:         'status',
-                urgency:        'urgency',
-                percentComplete:'pct_complete',
-                dollarValue:    'dollar_value',
-                dateArrived:    'date_arrived',
+                status:            'status',
+                urgency:           'urgency',
+                percentComplete:   'pct_complete',
+                dollarValue:       'dollar_value',
+                dateArrived:       'date_arrived',
+                repairDescription: 'description',
             };
 
             const dbField = fieldMap[fieldName];
@@ -9031,6 +9032,7 @@ Notes: ${notes}` : '',
                 document.getElementById('editPromisedDate').value = ro.promisedDate || '';
                 document.getElementById('editDateArrived').value = ro.dateArrived || '';
                 document.getElementById('editVin').value = ro.vin || '';
+                document.getElementById('editRepairDescription').value = ro.repairDescription || '';
 
                 // Restore RO type and insurance fields from Column W JSON
                 let savedInsData = null;
@@ -9225,6 +9227,7 @@ Notes: ${notes}` : '',
                         dateArrived: document.getElementById('editDateArrived').value,
                         repairType: repairTypes.join(', '),
                         vin: document.getElementById('editVin').value.toUpperCase(),
+                        repairDescription: document.getElementById('editRepairDescription').value,
                     };
 
                     // Diff old vs new — only log fields that actually changed
@@ -9240,6 +9243,7 @@ Notes: ${notes}` : '',
                         dateArrived: 'Date Arrived',
                         repairType: 'Repair Type',
                         vin: 'VIN',
+                        repairDescription: 'Repair Description',
                     };
                     const changes = [];
                     for (const [key, label] of Object.entries(fieldLabels)) {
@@ -9806,6 +9810,10 @@ Notes: ${notes}` : '',
                         <label class="form-label">Customer Address</label>
                         <input type="text" class="form-input" id="editCustomerAddress">
                         <div id="sug_edit_customerAddress"></div>
+                    </div>
+                    <div class="form-field full-width">
+                        <label class="form-label">Repair Description</label>
+                        <textarea class="form-input" id="editRepairDescription" rows="3" style="resize:vertical; min-height:64px;"></textarea>
                     </div>
                     <div class="form-field full-width">
                         <label class="form-label">Repair Type *</label>
