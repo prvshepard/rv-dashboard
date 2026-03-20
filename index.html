@@ -6850,13 +6850,21 @@ Notes: ${notes}` : '',
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4ZmVqaHVkY2hkZWpvaXdhZXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3OTE2NzEsImV4cCI6MjA4OTM2NzY3MX0.CF7XxtXOHg6Zpsb31m55YsMVd2QHSE5L3t7_FtMFfxY';
         // Lazy Supabase client — initialized on first use after SDK loads
         let _sb = null;
+        const SB_AUTH_OPTIONS = {
+            auth: {
+                persistSession:   true,   // keep session in localStorage across page loads
+                autoRefreshToken: true,   // silently refresh JWT before expiry using refresh token
+                storageKey:       'prvs_supabase_auth', // dedicated localStorage key
+                detectSessionInUrl: true, // handle OAuth redirects
+            }
+        };
         function getSB() {
             if (!_sb) {
                 // UMD build exposes supabase.createClient globally
                 if (typeof supabase !== 'undefined' && supabase.createClient) {
-                    _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, SB_AUTH_OPTIONS);
                 } else if (window.supabase && window.supabase.createClient) {
-                    _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, SB_AUTH_OPTIONS);
                 } else {
                     console.error('Supabase SDK not available yet');
                     return { from: () => ({ select: () => Promise.resolve({data:[], error: new Error('Supabase not ready')}) }), auth: { getSession: () => Promise.resolve({data:{session:null}}), signInWithIdToken: () => Promise.resolve({data:null, error: new Error('Supabase not ready')}) } };
@@ -7091,6 +7099,24 @@ Notes: ${notes}` : '',
             }
         }
 
+        // ── Supabase auth state listener ──────────────────────────────
+        // Keeps supabaseSession in sync whenever Supabase silently auto-refreshes
+        // the JWT (every ~55 min) so the UI and connection checks never go stale.
+        function initSupabaseAuthListener() {
+            getSB().auth.onAuthStateChange((event, session) => {
+                if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+                    supabaseSession = session;
+                    console.log('✅ Supabase session updated via onAuthStateChange:', event);
+                    updateAuthStatus(true);
+                } else if (event === 'SIGNED_OUT') {
+                    supabaseSession = null;
+                    currentUser = null;
+                    updateAuthStatus(false);
+                    console.log('🔒 Supabase session signed out');
+                }
+            });
+        }
+
         // Load saved token on page load
         async function loadSavedToken() {
             console.log('🔍 loadSavedToken called');
@@ -7101,6 +7127,9 @@ Notes: ${notes}` : '',
             const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
             console.log('Saved token exists:', !!savedToken, '| Expiry:', tokenExpiry);
+
+            // Register auth state listener once (idempotent — Supabase deduplicates)
+            initSupabaseAuthListener();
 
             // ── STEP 1: Always check Supabase session first ──────────
             // Supabase persists its own session in localStorage for weeks.
@@ -7480,8 +7509,9 @@ Notes: ${notes}` : '',
                 indicator.classList.add('connected');
                 status.textContent = 'Connected to PRVS Database';
                 authButton.textContent = 'Disconnect';
-                authButton.onclick = () => {
-                    clearToken();
+                authButton.onclick = async () => {
+                    await getSB().auth.signOut(); // end Supabase session
+                    clearToken();                 // clear Google OAuth token
                     updateAuthStatus(false);
                     currentData = sampleData;
                     renderBoard();
@@ -9129,15 +9159,16 @@ Notes: ${notes}` : '',
             updateAuthStatus(false);
 
             // Connect to Google Sheets button in header
-            connectSheetsBtn.addEventListener('click', () => {
+            connectSheetsBtn.addEventListener('click', async () => {
                 if (!gapiInited || !gisInited) {
                     alert('Google APIs are still loading. Please wait a moment and try again.');
                     return;
                 }
-                if (accessToken) {
-                    // Already connected, offer to disconnect
+                if (supabaseSession) {
+                    // Already connected via Supabase — offer to disconnect
                     if (confirm('You are already connected. Do you want to disconnect?')) {
-                        clearToken();
+                        await getSB().auth.signOut(); // ends Supabase session
+                        clearToken();                 // clears Google OAuth token + localStorage
                         updateAuthStatus(false);
                         currentData = sampleData;
                         renderBoard();
