@@ -125,13 +125,15 @@ Claude must complete ALL of these before the session ends (context limit, user s
 - `reauthorizeCalendar(filteredIndex)` uses `prompt:'consent'` to force interactive popup
 - After successful OAuth, `initSupabaseAuthListener()` in tokenClient callback re-opens the modal
 
-### Parts Request System (v1.267)
+### Parts Request System (v1.267–v1.269)
 - `has_open_parts_request` boolean column on `repair_orders` — **requires SQL migration** (see TODO list)
-- Parts request notes stored in `notes` table as BOTH `type: 'parts_request'` (for history modal) AND `type: 'ro_status'` (so they appear in the RO Status section on the card)
-- Email uses `send-quote-email` Edge Function with `type: 'parts_request'` param — **requires redeploy** of the Edge Function after v1.2 code is pushed
+- Parts request notes stored in `notes` table as `type: 'ro_status'` ONLY with body prefixed `🔩 PARTS REQUESTED: ...` — do NOT use `type: 'parts_request'` (violates `notes_type_check` constraint which only allows `ro_status` and `customer_comm`)
+- History modal (`openPartsRequestDetails`) queries: `.eq('type', 'ro_status').ilike('body', '%PARTS REQUESTED%')` — not `.eq('type', 'parts_request')`
+- Email uses `send-quote-email` Edge Function with `type: 'parts_request'` param — **requires redeploy** after v1.3 code push (adds inline photo thumbnails)
 - Management email hardcoded as `parts@patriotsrvservices.com` — placeholder until email group is created
 - `SUPABASE_ANON_KEY` and `SUPABASE_URL` constants (defined at top of init block) are used directly in the fetch call — no auth header upgrade needed since Edge Function is public
 - `markPartsOrdered()` is available to ALL roles (no role restriction) — business rule is that it's a manual acknowledgement only, tracked in audit log
+- **Photo attachments (v1.269):** `_partsRequestFiles[]` is module-level (not inside any function) — FileList objects are immutable, so files are copied into this mutable array; cleared to `[]` on modal open. `URL.createObjectURL(file)` used for instant local previews. Photos uploaded via existing `uploadToSupabaseStorage(file, roId)` helper and added to `photo_library` via `parseLibrary`/`serializeLibrary`/`updatePhotoLibraryInSheet`.
 
 ### GitHub Push
 - `gh` CLI is NOT available in the sandbox; use `git` directly from `/sessions/.../mnt/rv-dashboard/`
@@ -255,4 +257,4 @@ supabase functions deploy roof-lookup
 | 2026-03-20 | 5 | v1.265 cont. — persistent auth, 5× guard fixes, audit log fix, Chrome 145, 406 fix. v1.266 — write hardening |
 | 2026-03-20 | 6 | CLAUDE_CONTEXT.md restructured with TODO list, Session Protocol, Known Issues, SESSION_STARTER.md created |
 | 2026-03-20 | 7 | v1.267 — Parts Request System built end-to-end: modal, dictation, chip, email, resolution flow |
-| 2026-03-20 | 8 | v1.268 — Fix notes_type_check constraint error. v1.269 — Photo attachments in Parts Request: upload, library storage, inline email thumbnails |
+| 2026-03-20 | 8 | v1.268 — Fix notes_type_check constraint (parts_request → ro_status + body prefix). v1.269 — Photo attachments in Parts Request modal: _partsRequestFiles[], preview strip, upload to Storage, add to photo_library, inline thumbnails in email (Edge Function v1.3). Edge Function deploy instruction clarified. CLAUDE_CONTEXT Known Issues updated. |
