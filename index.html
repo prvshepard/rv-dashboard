@@ -2954,7 +2954,7 @@
 
         // Update RO Urgency
         async function updateROUrgency(index, newUrgency) {
-            if (!accessToken) {
+            if (!getSB()) {
                 alert('Please connect to PRVS database first!');
                 return;
             }
@@ -3105,7 +3105,7 @@
 
         // Update RO Progress manually
         async function updateROProgress(index, newProgress) {
-            if (!accessToken) {
+            if (!getSB()) {
                 alert('Please connect to PRVS database first!');
                 return;
             }
@@ -3151,7 +3151,7 @@
         }
 
         async function updateROStatus(index, newStatus) {
-            if (!accessToken) {
+            if (!getSB()) {
                 alert('Please connect to PRVS database first!');
                 return;
             }
@@ -3255,7 +3255,7 @@
 
         // Photo Upload Function
         async function uploadPhoto(index) {
-            if (!accessToken) {
+            if (!getSB()) {
                 alert('Please connect to PRVS database first!');
                 return;
             }
@@ -9177,8 +9177,8 @@ Notes: ${notes}` : '',
 
             newROForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
-                if (!accessToken) {
+
+                if (!getSB()) {
                     alert('Please connect to PRVS database first!');
                     return;
                 }
