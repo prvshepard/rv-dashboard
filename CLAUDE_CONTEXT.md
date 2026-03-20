@@ -74,7 +74,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 
 | File | Version | Description |
 |---|---|---|
-| `index.html` | **v1.269** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments |
+| `index.html` | **v1.270** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments |
 | `checkin.html` | **v1.26** | Technician clock-in/out, offline-first IndexedDB queue |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
 | `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup, PDF quotes |
@@ -134,6 +134,11 @@ Claude must complete ALL of these before the session ends (context limit, user s
 - `SUPABASE_ANON_KEY` and `SUPABASE_URL` constants (defined at top of init block) are used directly in the fetch call — no auth header upgrade needed since Edge Function is public
 - `markPartsOrdered()` is available to ALL roles (no role restriction) — business rule is that it's a manual acknowledgement only, tracked in audit log
 - **Photo attachments (v1.269):** `_partsRequestFiles[]` is module-level (not inside any function) — FileList objects are immutable, so files are copied into this mutable array; cleared to `[]` on modal open. `URL.createObjectURL(file)` used for instant local previews. Photos uploaded via existing `uploadToSupabaseStorage(file, roId)` helper and added to `photo_library` via `parseLibrary`/`serializeLibrary`/`updatePhotoLibraryInSheet`.
+
+### editField — Two Distinct Behaviors
+- `repairDescription` → **full replace**: modal pre-fills with current text, save writes the entire new value to `repair_orders.description`, audit log records old + new
+- `roStatusNotes` / `customerCommunicationNotes` → **append-only**: blank modal, new text gets `[timestamp - user]` prefix appended with `\n---\n` separator, written as new row in `notes` table
+- `showVoiceNotesModal(title, prefillValue = '')` — second param pre-fills textarea; leave empty for append-style fields
 
 ### GitHub Push
 - `gh` CLI is NOT available in the sandbox; use `git` directly from `/sessions/.../mnt/rv-dashboard/`
@@ -224,6 +229,7 @@ supabase functions deploy roof-lookup
 - ✅ **Parts Request System (v1.267)** — `openPartsRequestModal()` with voice dictation; `submitPartsRequest()` writes notes (type `parts_request` + `ro_status`), sets `has_open_parts_request=true`, emails `parts@patriotsrvservices.com`; neon-pink pulsing chip + card border on RO card; `openPartsRequestDetails()` shows history; `markPartsOrdered()` clears flag + logs resolution; `send-quote-email` v1.2 handles `type:'parts_request'` branch
 - ✅ **notes_type_check fix (v1.268)** — Changed parts request note insert from `type:'parts_request'` to `type:'ro_status'` with `🔩 PARTS REQUESTED:` body prefix; history query uses `.ilike('body', '%PARTS REQUESTED%')`
 - ✅ **Parts Request photo attachments (v1.269)** — `_partsRequestFiles[]` global array + `previewPartsPhotos/removePartsPhoto/renderPartsPhotoPreview` helpers; orange "📷 Attach / Take Photo(s)" button in modal; thumbnails with × remove; on submit uploads via `uploadToSupabaseStorage`, adds to RO `photo_library`, passes `photoUrls[]` to Edge Function; `send-quote-email` v1.3 embeds photos as inline clickable thumbnails in email HTML
+- ✅ **RO Description inline edit fix (v1.270)** — `showVoiceNotesModal` now accepts optional `prefillValue` param; modal pre-fills textarea with existing description, cursor placed at end; `editField` branches on `repairDescription`: full replace on save (not append), old value captured from `currentFilteredData` before mutation, `writeAuditLog` called with before/after; `roStatusNotes` and `customerCommunicationNotes` keep existing append + timestamp behavior
 
 ---
 
@@ -243,6 +249,7 @@ supabase functions deploy roof-lookup
 | v1.267 | 2026-03-20 | Parts Request System — modal, voice dictation, neon-pink pulsing chip, auto-note, management email, Mark Ordered flow |
 | v1.268 | 2026-03-20 | Fix notes_type_check constraint — use ro_status type + body prefix for parts request notes |
 | v1.269 | 2026-03-20 | Parts Request photo attachments — upload to Storage, add to photo_library, inline email thumbnails |
+| v1.270 | 2026-03-20 | RO Description inline edit — pre-fill modal with current content, full replace, before/after audit log |
 
 ---
 
@@ -258,3 +265,4 @@ supabase functions deploy roof-lookup
 | 2026-03-20 | 6 | CLAUDE_CONTEXT.md restructured with TODO list, Session Protocol, Known Issues, SESSION_STARTER.md created |
 | 2026-03-20 | 7 | v1.267 — Parts Request System built end-to-end: modal, dictation, chip, email, resolution flow |
 | 2026-03-20 | 8 | v1.268 — Fix notes_type_check constraint (parts_request → ro_status + body prefix). v1.269 — Photo attachments in Parts Request modal: _partsRequestFiles[], preview strip, upload to Storage, add to photo_library, inline thumbnails in email (Edge Function v1.3). Edge Function deploy instruction clarified. CLAUDE_CONTEXT Known Issues updated. |
+| 2026-03-20 | 9 | v1.270 — RO Description inline edit fix: showVoiceNotesModal prefillValue param, full replace on save, writeAuditLog before/after. Start-of-session checklist followed. |
