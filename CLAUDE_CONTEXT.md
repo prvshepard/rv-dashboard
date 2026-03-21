@@ -64,7 +64,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 | 🟡 | — | **Test calendar re-auth on iPhone** | Full mobile OAuth round-trip flow — confirm Schedule modal reopens after auth | ⏳ Needs field test |
 | 🟡 | — | **GitHub Release v1.265** | Tag exists on main; Roland creates manually at github.com/PatriotsRV/rv-dashboard/releases/new | ⏳ Roland action |
 | 🟡 | — | **GitHub Release v1.266** | Create release notes page on GitHub | ⏳ Roland action |
-| 🔴 | — | **Run SQL migration for Parts Request** | `ALTER TABLE repair_orders ADD COLUMN IF NOT EXISTS has_open_parts_request BOOLEAN DEFAULT false;` — run in Supabase SQL Editor before using the feature | ⏳ Roland action |
+| ✅ | — | **Run SQL migration for Parts Request** | `has_open_parts_request BOOLEAN` column confirmed present in `repair_orders` table | ✅ Done |
 | 🟠 | — | **Redeploy send-quote-email Edge Function** | v1.3 adds photo thumbnails in email; run `supabase functions deploy send-quote-email` | ⏳ Needs CLI deploy |
 | 🟡 | — | **Create parts@patriotsrvservices.com** | Management email group for parts request notifications | ⏳ Roland action |
 
