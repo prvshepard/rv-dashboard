@@ -61,7 +61,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 | 🟠 | GH#6 | **Employee Time Clock** | Full time clock feature in dashboard | ⏳ Open |
 | 🔴 | GH#10 | **Kenect API integration** | Pull customer conversation threads into RO view — blocked on Roland getting API credentials from Kenect support | ⏳ Roland action |
 | ✅ | GH#13 | **Pre-deploy backup system** | `scripts/backup.sh` — 6-version rolling snapshots to `.backups/` before every push | ✅ Done |
-| 🟡 | GH#12 | **Spanish language toggle** | Full UI translation of presentation layer only — labels, buttons, modals, status text. DB stays English. `t()` function approach. Self-selectable toggle per user (localStorage). Globe icon in header. checkin.html highest priority (techs). | ⏳ Open |
+| ✅ | GH#12 | **Spanish language toggle** | Full UI translation of presentation layer only — labels, buttons, modals, status text. DB stays English. `t()` function approach. Self-selectable toggle per user (localStorage). Globe icon in header. index.html done v1.277. checkin.html still open. | ✅ Done (index.html) |
 | 🟡 | GH#11 | **Solar Battery Bank tile — add Watt Hours** | Show Wh alongside Ah in Quote section (Wh = Ah × system voltage); update PDF output too | ⏳ Open |
 | 🟡 | GH#9 | **Parts form autocomplete** | Suggest part names, suppliers, part numbers from existing `parts` table history — both Manage Parts and Parts Request modal | ⏳ Open |
 | 🟡 | GH#2 | **Regular view layout customization** | Drag/resize tiles | ⏳ Open |
@@ -69,9 +69,9 @@ Claude must complete ALL of these before the session ends (context limit, user s
 | 🟡 | GH#8 | **Switchblade tile view** | Compact tile layout mode | ⏳ Open |
 | ✅ | — | **Deploy roof-lookup Edge Function** | Confirmed deployed — 5 deployments, updated 2 days ago | ✅ Done |
 | ✅ | — | **Test calendar re-auth on iPhone** | Full mobile OAuth round-trip flow — confirm Schedule modal reopens after auth | ✅ Done |
-| 🟡 | — | **GitHub Release v1.275** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.275 | ⏳ Roland action |
+| 🟡 | — | **GitHub Release v1.277** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.277 | ⏳ Roland action |
 | ✅ | — | **Fix Supabase rv-media bucket MIME types** | Roland confirmed bucket MIME list updated to include docx, xlsx, pptx, pdf, text, octet-stream | ✅ Done |
-| 🔴 | — | **Redeploy send-quote-email Edge Function** | v1.4 adds photo_share type — must redeploy for email photos feature to work | ⏳ Roland action |
+| ✅ | — | **Redeploy send-quote-email Edge Function v1.4** | photo_share type + CC repair@ on all emails — confirmed deployed | ✅ Done |
 | ✅ | — | **Run SQL migration for Parts Request** | `has_open_parts_request BOOLEAN` column confirmed present in `repair_orders` table | ✅ Done |
 | ✅ | — | **Redeploy send-quote-email Edge Function** | Confirmed deployed — 13 deployments, updated a day ago | ✅ Done |
 | 🟡 | — | **Create parts@patriotsrvservices.com** | Management email group for parts request notifications | ⏳ Roland action |
@@ -82,7 +82,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 
 | File | Version | Description |
 |---|---|---|
-| `index.html` | **v1.275** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments, photo lightbox viewer, email photos to customer |
+| `index.html` | **v1.277** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments, photo lightbox viewer, email photos to customer, Spanish language toggle |
 | `checkin.html` | **v1.26** | Technician clock-in/out, offline-first IndexedDB queue |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
 | `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup, PDF quotes |
@@ -154,6 +154,15 @@ Claude must complete ALL of these before the session ends (context limit, user s
 - `repairDescription` → **full replace**: modal pre-fills with current text, save writes the entire new value to `repair_orders.description`, audit log records old + new
 - `roStatusNotes` / `customerCommunicationNotes` → **append-only**: blank modal, new text gets `[timestamp - user]` prefix appended with `\n---\n` separator, written as new row in `notes` table
 - `showVoiceNotesModal(title, prefillValue = '')` — second param pre-fills textarea; leave empty for append-style fields
+
+### Spanish Language Toggle (v1.277)
+- **`t(str)`** — takes an English string as key, returns Spanish from `TRANSLATIONS_ES` or falls back to the English string. English IS the key — no abstract key names.
+- **`getLang()` / `setLang(lang)`** — reads/writes `prvs_lang` in localStorage. `setLang` also calls `translateStaticUI()` and `renderBoard()`.
+- **`setupI18n()`** — called once at `init()` time via `setTimeout(setupI18n, 50)`. Programmatically adds `data-i18n` attributes to static DOM elements (header h1, filter labels, filter buttons) using their English text as the key. Idempotent.
+- **`translateStaticUI()`** — queries all `[data-i18n]` elements, updates text content. For elements with child ELEMENT_NODEs (e.g. filter labels with chevron spans), updates only the first TEXT_NODE. Also updates `[data-i18n-ph]` placeholder attributes and syncs the globe button label.
+- **Emoji keys** — dict keys for some buttons include the emoji (e.g. `'🖨️ Print Label'`, `'🚪 Tech Check In'`, `'✏️ Edit RO'`). The emoji MUST be inside the `t()` call: `${t('🖨️ Print Label')}` NOT `🖨️ ${t('Print Label')}`.
+- **DB values stay English** — status dropdown `value=""` attributes must remain English; only the displayed option text is wrapped with `t()`.
+- **checkin.html** — Spanish toggle NOT yet applied to checkin.html (still open).
 
 ### Pre-Deploy Backup System
 - **Always run `bash scripts/backup.sh` before `git push origin main`** — this is step 7 of the End of Session Checklist
@@ -259,6 +268,9 @@ supabase functions deploy roof-lookup
 - ✅ **Email photos to customer (v1.275)** — "📧 Email Photos to Customer" button appears below photo grid if `ro.customerEmail` exists and photos are present; `openPhotoEmailModal(index)` shows overlay with checkboxes per photo (all pre-checked), pre-filled recipient email, optional message textarea; `sendPhotosToCustomer(index)` calls Edge Function with `type:'photo_share'`; `send-quote-email` Edge Function v1.4 adds `photo_share` branch — branded customer email with inline photo grid, each photo as clickable full-size link; **Roland must redeploy Edge Function** for this to work
 - ✅ **Pre-deploy backup system** — `scripts/backup.sh` creates timestamped snapshots of all 6 key files in `.backups/`, keeps last 6 versions, runs before every push per End of Session Checklist
 - ✅ **Photo & document upload fix (v1.271)** — `uploadDocument` fully migrated from Google Drive (was using expired `accessToken` → 401) to Supabase Storage (`uploadToSupabaseStorage` → `addDocToLibrary`); `uploadPhoto` and `uploadDocument` guards changed from `!getSB()` to `!getSB() || !supabaseSession`; session re-check added inside async `onchange` callback; error message updated to "Session expired — please refresh"
+- ✅ **Email photos auth fix (v1.276)** — `sendPhotosToCustomer` switched from `session?.access_token` to `SUPABASE_ANON_KEY` as Bearer token (consistent with `submitPartsRequest`); improved error handler checks `result.message` and HTTP status
+- ✅ **CC on photo emails (Edge Function v1.4b)** — `send-quote-email` always CCs `repair@patriotsrvservices.com` on every photo_share email send
+- ✅ **Spanish language toggle (v1.277, GH#12)** — Globe toggle button (🌐 ES / 🌐 EN) in header; `TRANSLATIONS_ES` dictionary (~70 key/value pairs); `t(str)` helper (English key → Spanish or fallback); `getLang()`/`setLang()` reading/writing `prvs_lang` in localStorage; `translateStaticUI()` updates all `[data-i18n]` DOM elements and `[data-i18n-ph]` placeholders; `setupI18n()` tags static header/filter DOM elements at init() time; all RO card strings wrapped with `t()`: urgency options, status dropdown, info labels (Type/RV/VIN/Tech/Phone/Email/Address), section titles, placeholder texts, button labels, parts badges, insurance badges, QR section, time logs; `updateStats()` "RVs on Lot" translated; `setupI18n()` called via `setTimeout` at end of `init()`
 
 ---
 
@@ -284,6 +296,8 @@ supabase functions deploy roof-lookup
 | v1.273 | 2026-03-22 | Fix document modal refresh — sync currentFilteredData photoLibrary after addDocToLibrary; openPhotoLibrary initialTab param; reopens on docs tab after upload |
 | v1.274 | 2026-03-22 | Add 60-second visibility note to document upload success alert |
 | v1.275 | 2026-03-22 | Photo lightbox viewer (tap to view/save, prev/next nav, Set as Main from viewer); Email photos to customer (send selected photos to RO customer email via Edge Function); Edge Function v1.4 adds photo_share type |
+| v1.276 | 2026-03-22 | Fix email photos auth — sendPhotosToCustomer uses SUPABASE_ANON_KEY (not session JWT); improved error handler |
+| v1.277 | 2026-03-22 | Spanish language toggle (GH#12) — globe button, TRANSLATIONS_ES dict, t() helper, translateStaticUI(), setupI18n(); full RO card + stats translation |
 
 ---
 
@@ -303,3 +317,4 @@ supabase functions deploy roof-lookup
 | 2026-03-20 | 10 | v1.271 — Fixed photo upload auth guard (!getSB() → !getSB()\|\|!supabaseSession, re-check in onchange). Migrated uploadDocument from Google Drive to Supabase Storage (eliminates 401). |
 | 2026-03-21 | 11 | No code changes. Verified + marked ✅ Done: SQL migration, roof-lookup deploy, send-quote-email deploy, calendar re-auth iPhone test. Added GH#9 (parts autocomplete), GH#10 (Kenect API integration), GH#11 (solar battery Wh). Added GitHub Release step to End of Session Checklist. Dropped v1.265/v1.266 backfill release items. |
 | 2026-03-22 | 12 | Added GH#12 (Spanish toggle), GH#13 (pre-deploy backup). Built scripts/backup.sh (6-version rotating snapshots). SESSION_STARTER.md overhauled (hardened rules, GitHub fallback path, RESET/PAUSE/STOP commands, Key Reference table). PRVS_Technician_Guide.docx created. v1.272 MIME fix. v1.273 document modal refresh fix. v1.274 60-second note. v1.275 photo lightbox viewer + email photos to customer + Edge Function v1.4 photo_share type. Context limit hit — session ended mid-work. |
+| 2026-03-22 | 13 | v1.276 email auth fix (SUPABASE_ANON_KEY). Edge Function v1.4 CC on photo emails deployed. v1.277 Spanish toggle (GH#12) complete — TRANSLATIONS_ES dict, t(), translateStaticUI(), setupI18n(), full renderBoard() + updateStats() translation. |

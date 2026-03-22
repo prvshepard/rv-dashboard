@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-    PRVS Dashboard v1.276
+    PRVS Dashboard v1.277
     Released: 2026-03-22
+    v1.277: Spanish language toggle (GH#12) — globe button in header, TRANSLATIONS_ES dictionary, t() helper, translateStaticUI(), setupI18n(); all RO card UI strings, status dropdowns, urgency labels, info rows, buttons, section titles, and empty state translated; persists to localStorage
     v1.276: Fix email photos auth — switch from session access_token to SUPABASE_ANON_KEY (consistent with submitPartsRequest); improve error message to include result.message and HTTP status
     v1.275: Photo lightbox viewer (tap to view/save full size, prev/next nav, Set as Main); Email photos to customer from Photos modal; photo_share Edge Function type
     v1.274: Add 60-second visibility note to document upload success message
@@ -2474,8 +2475,9 @@
                 <span id="currentTime">—</span>
                 <span id="totalRVs">0 RVs on Lot</span>
             </div>
-            <div style="text-align: right; margin-top: 8px;">
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.276</span>
+            <div style="text-align: right; margin-top: 8px; display:flex; justify-content:flex-end; align-items:center; gap:12px;">
+                <button id="langToggleBtn" onclick="setLang(getLang()==='es'?'en':'es')" title="Toggle Spanish / English" style="background:transparent;border:1px solid #d1d5db;border-radius:6px;padding:3px 10px;font-size:0.75rem;color:#6b7280;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:0.03em;">🌐 ES</button>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.277</span>
             </div>
         </header>
 
@@ -6060,7 +6062,7 @@ Notes: ${notes}` : '',
 
         // Initialize
         function init() {
-            console.log('📦 PRVS Dashboard v1.276 - Released 2026-03-22');
+            console.log('📦 PRVS Dashboard v1.277 - Released 2026-03-22');
 
             // Auto-fill saved Anthropic API key into both scan inputs
             const savedAnthropicKey = localStorage.getItem('prvs_anthropic_key');
@@ -6092,6 +6094,9 @@ Notes: ${notes}` : '',
                 }
             };
             setTimeout(checkAuth, 500);
+
+            // Initialize i18n — tags static DOM elements and applies saved language
+            setTimeout(setupI18n, 50);
         }
 
         function updateClock() {
@@ -6417,7 +6422,7 @@ Notes: ${notes}` : '',
                 grid.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-icon">🔍</div>
-                        <div class="empty-text">No RVs match the current filters</div>
+                        <div class="empty-text">${t('No RVs match the current filters')}</div>
                     </div>
                 `;
                 return;
@@ -6434,10 +6439,10 @@ Notes: ${notes}` : '',
                             <select class="urgency-dropdown urgency-${(ro.urgency || 'Medium').toLowerCase()}" 
                                     onchange="updateROUrgency(${index}, this.value)"
                                     title="Change urgency level">
-                                <option value="Critical" ${ro.urgency === 'Critical' ? 'selected' : ''}>CRITICAL</option>
-                                <option value="High" ${ro.urgency === 'High' ? 'selected' : ''}>HIGH</option>
-                                <option value="Medium" ${ro.urgency === 'Medium' ? 'selected' : ''}>MEDIUM</option>
-                                <option value="Low" ${ro.urgency === 'Low' ? 'selected' : ''}>LOW</option>
+                                <option value="Critical" ${ro.urgency === 'Critical' ? 'selected' : ''}>${t('CRITICAL')}</option>
+                                <option value="High" ${ro.urgency === 'High' ? 'selected' : ''}>${t('HIGH')}</option>
+                                <option value="Medium" ${ro.urgency === 'Medium' ? 'selected' : ''}>${t('MEDIUM')}</option>
+                                <option value="Low" ${ro.urgency === 'Low' ? 'selected' : ''}>${t('LOW')}</option>
                             </select>
                         </div>
                         ` : ''}
@@ -6452,7 +6457,7 @@ Notes: ${notes}` : '',
                         <div class="card-header-row">
                             ${shouldShow('daysOnLot') ? `
                             <div class="days-on-lot" style="color: ${getDaysHeatColor(calculateDaysOnLot(ro))};">
-                                ${calculateDaysOnLot(ro) !== null ? calculateDaysOnLot(ro) + ' <span class=\"days-label\">Days</span>' : '<span class=\"days-label\">Not On Lot</span>'}
+                                ${calculateDaysOnLot(ro) !== null ? calculateDaysOnLot(ro) + ' <span class=\"days-label\">' + t('Days') + '</span>' : '<span class=\"days-label\">' + t('Not On Lot') + '</span>'}
                             </div>
                             ` : ''}
                             ${shouldShow('dollarValue') && ro.dollarValue !== undefined && ro.dollarValue !== null ? `
@@ -6464,13 +6469,13 @@ Notes: ${notes}` : '',
                         ` : ''}
                         
                         ${shouldShow('customerName') ? `
-                        <div class="customer-name">${ro.customerName || 'Unknown Customer'}</div>
+                        <div class="customer-name">${ro.customerName || t('Unknown Customer')}</div>
                         ${ro.roId ? `<div style="font-size:0.7rem; font-family:'JetBrains Mono',monospace; color:var(--accent-info); letter-spacing:0.05em; margin-top:-4px; margin-bottom:4px;">${ro.roId}</div>` : ''}
-                        ${ro.insuranceData ? (() => { try { const d = JSON.parse(ro.insuranceData); if (!d.isInsuranceClaim) return ''; const badges = '<div class="insurance-badge">🛡️ Insurance Claim</div>'; const hybrid = d.roType === 'hybrid' ? '<div class="customer-pay-badge">💵 Customer Pay</div>' : ''; return badges + hybrid; } catch(e) { return ''; } })() : ''}
-                        ${ro.partsJson ? (() => { try { const parts = JSON.parse(ro.partsJson); if (!parts.length) return ''; const hasBackordered = parts.some(p => p.status === 'Backordered' || p.status === 'Lost'); const hasOutstanding = parts.some(p => p.status === 'Ordered' || p.status === 'In Transit'); const allDone = parts.every(p => p.status === 'Received' || p.status === 'Installed' || p.status === 'Returned'); const color = hasBackordered ? 'red' : hasOutstanding ? 'yellow' : 'green'; const worstLabel = hasBackordered ? (parts.filter(p => p.status==='Backordered'||p.status==='Lost').length + ' Backordered') : hasOutstanding ? (parts.filter(p => p.status==='Ordered'||p.status==='In Transit').length + ' Outstanding') : 'All Received'; return '<div class="parts-badge ' + color + '" onclick="openPartsModal(' + index + ')">🔩 ' + parts.length + ' Parts • ' + worstLabel + '</div>'; } catch(e) { return ''; } })() : ''}
+                        ${ro.insuranceData ? (() => { try { const d = JSON.parse(ro.insuranceData); if (!d.isInsuranceClaim) return ''; const badges = '<div class="insurance-badge">🛡️ ' + t('Insurance Claim') + '</div>'; const hybrid = d.roType === 'hybrid' ? '<div class="customer-pay-badge">💵 ' + t('Customer Pay') + '</div>' : ''; return badges + hybrid; } catch(e) { return ''; } })() : ''}
+                        ${ro.partsJson ? (() => { try { const parts = JSON.parse(ro.partsJson); if (!parts.length) return ''; const hasBackordered = parts.some(p => p.status === 'Backordered' || p.status === 'Lost'); const hasOutstanding = parts.some(p => p.status === 'Ordered' || p.status === 'In Transit'); const allDone = parts.every(p => p.status === 'Received' || p.status === 'Installed' || p.status === 'Returned'); const color = hasBackordered ? 'red' : hasOutstanding ? 'yellow' : 'green'; const worstLabel = hasBackordered ? (parts.filter(p => p.status==='Backordered'||p.status==='Lost').length + ' ' + t('Backordered')) : hasOutstanding ? (parts.filter(p => p.status==='Ordered'||p.status==='In Transit').length + ' ' + t('Outstanding')) : t('All Received'); return '<div class="parts-badge ' + color + '" onclick="openPartsModal(' + index + ')">🔩 ' + parts.length + ' Parts • ' + worstLabel + '</div>'; } catch(e) { return ''; } })() : ''}
                         ${ro.hasOpenPartsRequest ? `
                         <div class="parts-request-chip" onclick="openPartsRequestDetails(${index})" title="Parts requested — click to view details or mark ordered">
-                            🔩 PARTS REQUESTED — PENDING ORDER
+                            🔩 ${t('PARTS REQUESTED — PENDING ORDER')}
                         </div>
                         ` : ''}
                         ` : ''}
@@ -6478,31 +6483,31 @@ Notes: ${notes}` : '',
                         <!-- QR Code — collapsible toggle always shown, content hidden by default in Regular view -->
                         <div class="qr-collapsible-wrapper">
                             <button class="qr-toggle-btn" onclick="toggleQRSection(this, ${index})" title="Show/Hide QR Code">
-                                📱 QR Code <span class="qr-chevron">▼</span>
+                                📱 ${t('QR Code')} <span class="qr-chevron">▼</span>
                             </button>
                             <div class="qr-collapsible" style="display:none;">
                                 <div class="qr-code-section">
                                     <div class="qr-code-container" onclick="openQRModal(${index})">
                                         <canvas id="qr-${index}" class="qr-canvas"></canvas>
                                     </div>
-                                    <div class="qr-label">${ro.customerName || 'Unknown'}</div>
+                                    <div class="qr-label">${ro.customerName || t('Unknown')}</div>
                                     ${shouldShow('rvDetails') ? `
-                                    <div class="qr-label" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: -4px;">${ro.rv || 'RV Not Specified'}</div>
+                                    <div class="qr-label" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: -4px;">${ro.rv || t('RV Not Specified')}</div>
                                     ` : ''}
                                     <button class="print-qr-btn" onclick="printQRLabel(${index})" title="Print QR Label">
-                                        🖨️ Print Label
+                                        ${t('🖨️ Print Label')}
                                     </button>
                                 </div>
                             </div>
                         </div>
                         
                         <button class="checkin-btn" onclick="openCheckIn(${index})" title="Check in to this RO">
-                            🚪 Tech Check In
+                            ${t('🚪 Tech Check In')}
                         </button>
                         
                         ${shouldShow('photoUpload') ? `
                         <button class="photo-upload-btn" onclick="openPhotoLibrary(${index})" title="Manage Photos & Docs">
-                            📷 ${ro.rvPhotoUrl ? 'Manage Photos & Docs' : 'Add Photo / Docs'}
+                            📷 ${ro.rvPhotoUrl ? t('Manage Photos & Docs') : t('Add Photo / Docs')}
                         </button>
                         ` : ''}
                         
@@ -6511,16 +6516,16 @@ Notes: ${notes}` : '',
                             <select class="status-dropdown status-${statusClass}" 
                                     onchange="updateROStatus(${index}, this.value)"
                                     data-original-status="${ro.status}">
-                                <option value="Not On Lot" ${ro.status === 'Not On Lot' ? 'selected' : ''}>Not On Lot</option>
-                                <option value="On Lot" ${ro.status === 'On Lot' ? 'selected' : ''}>On Lot</option>
-                                <option value="Awaiting Approval" ${ro.status === 'Awaiting Approval' ? 'selected' : ''}>Awaiting Approval</option>
-                                <option value="Awaiting parts" ${ro.status === 'Awaiting parts' ? 'selected' : ''}>Awaiting Parts</option>
-                                <option value="Scheduled" ${ro.status === 'Scheduled' ? 'selected' : ''}>Scheduled</option>
-                                <option value="In progress" ${ro.status === 'In progress' ? 'selected' : ''}>In Progress</option>
-                                <option value="Repairs Completed" ${ro.status === 'Repairs Completed' ? 'selected' : ''}>Repairs Completed</option>
-                                <option value="Waiting for QA/QC" ${ro.status === 'Waiting for QA/QC' ? 'selected' : ''}>Waiting for QA/QC</option>
-                                <option value="Ready for pickup" ${ro.status === 'Ready for pickup' ? 'selected' : ''}>Ready for Pickup</option>
-                                <option value="Delivered/Cashed Out" ${ro.status === 'Delivered/Cashed Out' ? 'selected' : ''}>Delivered/Cashed Out</option>
+                                <option value="Not On Lot" ${ro.status === 'Not On Lot' ? 'selected' : ''}>${t('Not On Lot')}</option>
+                                <option value="On Lot" ${ro.status === 'On Lot' ? 'selected' : ''}>${t('On Lot')}</option>
+                                <option value="Awaiting Approval" ${ro.status === 'Awaiting Approval' ? 'selected' : ''}>${t('Awaiting Approval')}</option>
+                                <option value="Awaiting parts" ${ro.status === 'Awaiting parts' ? 'selected' : ''}>${t('Awaiting Parts')}</option>
+                                <option value="Scheduled" ${ro.status === 'Scheduled' ? 'selected' : ''}>${t('Scheduled')}</option>
+                                <option value="In progress" ${ro.status === 'In progress' ? 'selected' : ''}>${t('In Progress')}</option>
+                                <option value="Repairs Completed" ${ro.status === 'Repairs Completed' ? 'selected' : ''}>${t('Repairs Completed')}</option>
+                                <option value="Waiting for QA/QC" ${ro.status === 'Waiting for QA/QC' ? 'selected' : ''}>${t('Waiting for QA/QC')}</option>
+                                <option value="Ready for pickup" ${ro.status === 'Ready for pickup' ? 'selected' : ''}>${t('Ready for Pickup')}</option>
+                                <option value="Delivered/Cashed Out" ${ro.status === 'Delivered/Cashed Out' ? 'selected' : ''}>${t('Delivered/Cashed Out')}</option>
                             </select>
                         </div>
                         ` : ''}
@@ -6529,7 +6534,7 @@ Notes: ${notes}` : '',
                         <div class="rv-info">
                             ${shouldShow('repairTypeTags') ? `
                             <div class="info-row">
-                                <span class="info-label">Type:</span>
+                                <span class="info-label">${t('Type:')}</span>
                                 <span class="info-value repair-types-container">
                                     ${(ro.repairType || 'General').split(',').map(type => 
                                         `<span class="repair-type-tag">${type.trim()}</span>`
@@ -6539,37 +6544,37 @@ Notes: ${notes}` : '',
                             ` : ''}
                             ${shouldShow('rvDetails') ? `
                             <div class="info-row">
-                                <span class="info-label">RV:</span>
-                                <span class="info-value">${ro.rv || 'Not specified'}</span>
+                                <span class="info-label">${t('RV:')}</span>
+                                <span class="info-value">${ro.rv || t('Not specified')}</span>
                             </div>
                             ${ro.vin ? `
                             <div class="info-row">
-                                <span class="info-label">VIN:</span>
+                                <span class="info-label">${t('VIN:')}</span>
                                 <span class="info-value" style="font-family:'JetBrains Mono',monospace; font-size:0.8rem; letter-spacing:0.04em;">${ro.vin}</span>
                             </div>
                             ` : ''}
                             ` : ''}
                             ${shouldShow('technicianAssigned') ? `
                             <div class="info-row">
-                                <span class="info-label">Tech:</span>
-                                <span class="info-value">${ro.technicianAssigned || 'Unassigned'}</span>
+                                <span class="info-label">${t('Tech:')}</span>
+                                <span class="info-value">${ro.technicianAssigned || t('Unassigned')}</span>
                             </div>
                             ` : ''}
                             ${shouldShow('contactInfo') && ro.customerPhone ? `
                             <div class="info-row">
-                                <span class="info-label">Phone:</span>
+                                <span class="info-label">${t('Phone:')}</span>
                                 <span class="info-value"><a href="tel:${ro.customerPhone}" class="contact-link">${ro.customerPhone}</a></span>
                             </div>
                             ` : ''}
                             ${shouldShow('contactInfo') && ro.customerEmail ? `
                             <div class="info-row">
-                                <span class="info-label">Email:</span>
+                                <span class="info-label">${t('Email:')}</span>
                                 <span class="info-value"><a href="mailto:${ro.customerEmail}" class="contact-link">${ro.customerEmail}</a></span>
                             </div>
                             ` : ''}
                             ${shouldShow('contactInfo') && ro.customerAddress ? `
                             <div class="info-row">
-                                <span class="info-label">Address:</span>
+                                <span class="info-label">${t('Address:')}</span>
                                 <span class="info-value">${ro.customerAddress}</span>
                             </div>
                             ` : ''}
@@ -6580,16 +6585,16 @@ Notes: ${notes}` : '',
                         <div class="note-item editable-field" onclick="editField(${index}, 'repairDescription', '${ro.repairDescription ? ro.repairDescription.replace(/'/g, "\\'").replace(/"/g, '&quot;') : ''}')"> 
                             <div class="note-header">
                                 <span class="note-icon">🔩</span>
-                                <span class="note-title">Repair Description</span>
+                                <span class="note-title">${t('Repair Description')}</span>
                             </div>
-                            <div class="note-content repair-desc">${ro.repairDescription || '<span class="placeholder-text">Click Here To Update</span>'}</div>
+                            <div class="note-content repair-desc">${ro.repairDescription || '<span class="placeholder-text">' + t('Click Here To Update') + '</span>'}</div>
                         </div>
                         ` : ''}
                         
                         ${shouldShow('progressBar') && ro.percentComplete !== undefined && ro.percentComplete !== null ? `
                         <div class="progress-section">
                             <div class="progress-header">
-                                <span class="progress-label">Progress</span>
+                                <span class="progress-label">${t('Progress')}</span>
                                 <input type="number" 
                                        class="progress-input" 
                                        value="${ro.percentComplete}" 
@@ -6612,18 +6617,18 @@ Notes: ${notes}` : '',
                             <div class="note-item editable-field" onclick="editField(${index}, 'roStatusNotes', '${ro.roStatusNotes ? ro.roStatusNotes.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') : ''}')">
                                 <div class="note-header">
                                     <span class="note-icon">🔧</span>
-                                    <span class="note-title">RO Status</span>
+                                    <span class="note-title">${t('RO Status')}</span>
                                 </div>
-                                <div class="note-content">${ro.roStatusNotes ? ro.roStatusNotes.split('\n').reverse().join('\n') : '<span class="placeholder-text">Click Here To Update</span>'}</div>
+                                <div class="note-content">${ro.roStatusNotes ? ro.roStatusNotes.split('\n').reverse().join('\n') : '<span class="placeholder-text">' + t('Click Here To Update') + '</span>'}</div>
                             </div>
                             ` : ''}
                             ${shouldShow('customerCommNotes') ? `
                             <div class="note-item editable-field" onclick="editField(${index}, 'customerCommunicationNotes', '${ro.customerCommunicationNotes ? ro.customerCommunicationNotes.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') : ''}')">
                                 <div class="note-header">
                                     <span class="note-icon">💬</span>
-                                    <span class="note-title">Customer Comm</span>
+                                    <span class="note-title">${t('Customer Comm')}</span>
                                 </div>
-                                <div class="note-content">${ro.customerCommunicationNotes ? ro.customerCommunicationNotes.split('\n').reverse().join('\n') : '<span class="placeholder-text">Click Here To Update</span>'}</div>
+                                <div class="note-content">${ro.customerCommunicationNotes ? ro.customerCommunicationNotes.split('\n').reverse().join('\n') : '<span class="placeholder-text">' + t('Click Here To Update') + '</span>'}</div>
                             </div>
                             ` : ''}
                         </div>
@@ -6638,14 +6643,14 @@ Notes: ${notes}` : '',
                                     <div class="time-logs-header">
                                         <span class="time-icon">⏱️</span>
                                         <span class="time-total">${formatHours(timeStats.totalSeconds)}</span>
-                                        <span class="time-sessions">(${timeStats.sessionCount} session${timeStats.sessionCount !== 1 ? 's' : ''})</span>
+                                        <span class="time-sessions">(${timeStats.sessionCount} ${timeStats.sessionCount !== 1 ? t('sessions') : t('session')})</span>
                                     </div>
                                     <button class="view-time-logs-btn" onclick="openTimeLogsModal(${index})" title="View detailed time logs">
-                                        View Time Logs
+                                        ${t('View Time Logs')}
                                     </button>
                                     ${isAdmin() ? `
                                     <button class="view-time-logs-btn" onclick="manualRefreshTimeLogs()" title="Admin: Force refresh time logs from Google Sheets" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); margin-top: 8px;">
-                                        🔄 Refresh Time Logs
+                                        ${t('🔄 Refresh Time Logs')}
                                     </button>
                                     ` : ''}
                                 </div>
@@ -6656,28 +6661,28 @@ Notes: ${notes}` : '',
                         
                         ${shouldShow('editButton') ? `
                         <button class="edit-ro-btn" onclick="openEditRO(${index})">
-                            ✏️ Edit RO
+                            ${t('✏️ Edit RO')}
                         </button>
                         <button class="parts-btn" onclick="openPartsModal(${index})">
-                            🔩 Manage Parts
+                            ${t('🔩 Manage Parts')}
                         </button>
                         ` : ''}
                         <button class="request-parts-btn" onclick="openPartsRequestModal(${index})" title="Submit a parts request for this RO">
-                            🔩 Request Parts
+                            ${t('🔩 Request Parts')}
                         </button>
                         ${ro.hasOpenPartsRequest ? `
                         <button class="mark-ordered-btn" onclick="markPartsOrdered(${index})" title="Confirm parts have been ordered — clears the indicator">
-                            ✅ Mark Parts Ordered
+                            ${t('✅ Mark Parts Ordered')}
                         </button>
                         ` : ''}
                         ${(isAdmin() || hasRole('Manager')) && ro.status !== 'Delivered/Cashed Out' ? `
                         <button class="schedule-ro-btn" onclick="openScheduleModal(${index})">
-                            📅 ${ro.status === 'Scheduled' ? 'Reschedule' : 'Schedule'}
+                            📅 ${ro.status === 'Scheduled' ? t('Reschedule') : t('Schedule')}
                         </button>` : ''}
 
                         ${isAdmin() && (ro.status === 'Delivered/Cashed Out') ? `
                         <button class="archive-ro-btn visible" onclick="archiveRO(${index})">
-                            📦 Archive to Cashiered
+                            ${t('📦 Archive to Cashiered')}
                         </button>
                         ` : ''}
                     </div>
@@ -7022,7 +7027,7 @@ Notes: ${notes}` : '',
             longestWaitEl.textContent = longestWait;
             longestWaitEl.style.color = getDaysHeatColor(longestWait);
             
-            document.getElementById('totalRVs').textContent = `${filtered} RVs on Lot`;
+            document.getElementById('totalRVs').textContent = `${filtered} ${t('RVs on Lot')}`;
             
             // Status color map for the left border accent on dynamic cards
             const statusColorMap = {
@@ -7124,6 +7129,181 @@ Notes: ${notes}` : '',
         // ── Supabase Configuration ──────────────────────────────────
         const SUPABASE_URL = 'https://axfejhudchdejoiwaetq.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4ZmVqaHVkY2hkZWpvaXdhZXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3OTE2NzEsImV4cCI6MjA4OTM2NzY3MX0.CF7XxtXOHg6Zpsb31m55YsMVd2QHSE5L3t7_FtMFfxY';
+
+        // ── LANGUAGE / i18n ──────────────────────────────────────────────
+        const TRANSLATIONS_ES = {
+            // Header & nav
+            'PRVS Repair Order Dashboard': 'Panel de Órdenes PRVS',
+            '+ New RO': '+ Nueva OR',
+            'Live': 'En Vivo',
+            'RVs on Lot': 'RVs en el Lote',
+            // Search & filters
+            '🔍 Search by Customer Name:': '🔍 Buscar por Nombre:',
+            'Type customer name to filter...': 'Escriba el nombre del cliente...',
+            '✕ Clear': '✕ Limpiar',
+            'Filter by Days on Lot ≥': 'Días en el Lote ≥',
+            'Filter by Parts Status': 'Filtrar por Partes',
+            'Filter by Insurance': 'Filtrar por Seguro',
+            'Filter by Repair Type:': 'Tipo de Reparación:',
+            'Filter by Status': 'Filtrar por Estado',
+            'All ROs': 'Todas',
+            '⚠️ Outstanding': '⚠️ Pendientes',
+            '🔴 Backordered': '🔴 Pedido Pendiente',
+            'All': 'Todos',
+            '🛡️ Insurance': '🛡️ Seguro',
+            '🔀 Hybrid': '🔀 Híbrido',
+            '🔧 Standard': '🔧 Estándar',
+            // RO status values
+            'Not On Lot': 'No en el Lote',
+            'On Lot': 'En el Lote',
+            'Awaiting Approval': 'Esperando Aprobación',
+            'Awaiting parts': 'Esperando Partes',
+            'Awaiting Parts': 'Esperando Partes',
+            'Scheduled': 'Programado',
+            'In progress': 'En Progreso',
+            'In Progress': 'En Progreso',
+            'Repairs Completed': 'Reparaciones Completadas',
+            'Waiting for QA/QC': 'Esperando QA/QC',
+            'Ready for pickup': 'Listo para Recoger',
+            'Ready for Pickup': 'Listo para Recoger',
+            'Delivered/Cashed Out': 'Entregado/Cerrado',
+            // Urgency
+            'CRITICAL': 'CRÍTICO',
+            'HIGH': 'ALTO',
+            'MEDIUM': 'MEDIO',
+            'LOW': 'BAJO',
+            // Card labels
+            'Days': 'Días',
+            'RV Not Specified': 'RV No Especificado',
+            'Unknown Customer': 'Cliente Desconocido',
+            'Unknown': 'Desconocido',
+            'Not specified': 'No especificado',
+            'Unassigned': 'Sin Asignar',
+            'Click Here To Update': 'Toca Para Actualizar',
+            'Insurance Claim': 'Reclamo de Seguro',
+            'Customer Pay': 'Pago del Cliente',
+            'PARTS REQUESTED — PENDING ORDER': 'PARTES SOLICITADAS — PEDIDO PENDIENTE',
+            // Info row labels
+            'Type:': 'Tipo:',
+            'RV:': 'RV:',
+            'VIN:': 'VIN:',
+            'Tech:': 'Técnico:',
+            'Phone:': 'Teléfono:',
+            'Email:': 'Correo:',
+            'Address:': 'Dirección:',
+            // Section titles
+            'Repair Description': 'Descripción de Reparación',
+            'RO Status': 'Estado de la OR',
+            'Customer Comm': 'Comunicación',
+            'Progress': 'Progreso',
+            // Time logs
+            'View Time Logs': 'Ver Horas',
+            '🔄 Refresh Time Logs': '🔄 Actualizar Horas',
+            'session': 'sesión',
+            'sessions': 'sesiones',
+            // Card buttons
+            'QR Code': 'Código QR',
+            '🖨️ Print Label': '🖨️ Imprimir',
+            '🚪 Tech Check In': '🚪 Check-In Técnico',
+            'Manage Photos & Docs': 'Gestionar Fotos y Docs',
+            'Add Photo / Docs': 'Agregar Foto / Docs',
+            '✏️ Edit RO': '✏️ Editar OR',
+            '🔩 Manage Parts': '🔩 Gestionar Partes',
+            '🔩 Request Parts': '🔩 Solicitar Partes',
+            '✅ Mark Parts Ordered': '✅ Confirmar Pedido',
+            'Schedule': 'Programar',
+            'Reschedule': 'Reprogramar',
+            '📦 Archive to Cashiered': '📦 Archivar',
+            // Parts badge labels
+            'Outstanding': 'Pendiente',
+            'Backordered': 'Pedido Pendiente',
+            'All Received': 'Todo Recibido',
+            // Empty state
+            'No RVs match the current filters': 'Ningún RV coincide con los filtros',
+            // Photo modal
+            'Photos & Docs': 'Fotos y Docs',
+            'Tap a photo to view full size. Set as main from the viewer.': 'Toca para ver tamaño completo.',
+            '📷 Add New Photo': '📷 Agregar Foto',
+            '📎 Upload Document': '📎 Subir Documento',
+            'No photos yet.': 'Sin fotos aún.',
+            'No documents yet.': 'Sin documentos aún.',
+            '📧 Email Photos to Customer': '📧 Enviar Fotos al Cliente',
+            '✕ Close': '✕ Cerrar',
+        };
+
+        function getLang() { return localStorage.getItem('prvs_lang') || 'en'; }
+
+        function setLang(lang) {
+            localStorage.setItem('prvs_lang', lang);
+            translateStaticUI();
+            renderBoard();
+            const btn = document.getElementById('langToggleBtn');
+            if (btn) btn.textContent = lang === 'es' ? '🌐 EN' : '🌐 ES';
+        }
+
+        function t(str) {
+            if (getLang() !== 'es') return str;
+            return (TRANSLATIONS_ES[str] !== undefined) ? TRANSLATIONS_ES[str] : str;
+        }
+
+        function translateStaticUI() {
+            // Translate elements tagged with data-i18n (text content)
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.dataset.i18n;
+                const translated = t(key);
+                // If element has child element nodes (spans etc.), only update first text node
+                const hasChildElements = [...el.childNodes].some(n => n.nodeType === Node.ELEMENT_NODE);
+                if (hasChildElements) {
+                    for (const node of el.childNodes) {
+                        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+                            node.textContent = translated + ' ';
+                            break;
+                        }
+                    }
+                } else {
+                    el.textContent = translated;
+                }
+            });
+            // Translate placeholder attributes
+            document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+                el.placeholder = t(el.dataset.i18nPh);
+            });
+            // Sync lang toggle button label
+            const btn = document.getElementById('langToggleBtn');
+            if (btn) btn.textContent = getLang() === 'es' ? '🌐 EN' : '🌐 ES';
+        }
+
+        function setupI18n() {
+            // Tag static header elements
+            const h1 = document.querySelector('header h1');
+            if (h1) h1.dataset.i18n = 'PRVS Repair Order Dashboard';
+            const newROBtn = document.getElementById('newROBtn');
+            if (newROBtn) newROBtn.dataset.i18n = '+ New RO';
+            const liveSpan = document.querySelector('.live-indicator span:last-child');
+            if (liveSpan) liveSpan.dataset.i18n = 'Live';
+            const searchLabel = document.querySelector('.search-label');
+            if (searchLabel) searchLabel.dataset.i18n = '🔍 Search by Customer Name:';
+            const searchInput = document.getElementById('customerSearch');
+            if (searchInput) searchInput.dataset.i18nPh = 'Type customer name to filter...';
+            const clearBtn = document.getElementById('clearSearch');
+            if (clearBtn) clearBtn.dataset.i18n = '✕ Clear';
+            // Tag filter section labels (preserve child spans)
+            document.querySelectorAll('.filter-label').forEach(el => {
+                // Grab the text-only content (ignore child spans like chevron/dot)
+                let text = '';
+                el.childNodes.forEach(n => { if (n.nodeType === Node.TEXT_NODE) text += n.textContent; });
+                text = text.trim();
+                if (text && TRANSLATIONS_ES[text]) el.dataset.i18n = text;
+            });
+            // Tag filter buttons (only ones with translatable text)
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                const key = btn.textContent.trim();
+                if (TRANSLATIONS_ES[key] !== undefined) btn.dataset.i18n = key;
+            });
+            // Apply initial language (in case user has ES set from previous session)
+            translateStaticUI();
+        }
+
         // Lazy Supabase client — initialized on first use after SDK loads
         let _sb = null;
         const SB_AUTH_OPTIONS = {
