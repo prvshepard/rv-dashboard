@@ -69,7 +69,8 @@ Claude must complete ALL of these before the session ends (context limit, user s
 | 🟡 | GH#8 | **Switchblade tile view** | Compact tile layout mode | ⏳ Open |
 | ✅ | — | **Deploy roof-lookup Edge Function** | Confirmed deployed — 5 deployments, updated 2 days ago | ✅ Done |
 | ✅ | — | **Test calendar re-auth on iPhone** | Full mobile OAuth round-trip flow — confirm Schedule modal reopens after auth | ✅ Done |
-| 🟡 | — | **GitHub Release v1.271** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.271, paste RELEASE_NOTES content | ⏳ Roland action |
+| 🟡 | — | **GitHub Release v1.272** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.272 | ⏳ Roland action |
+| 🟡 | — | **Fix Supabase rv-media bucket MIME types** | Go to Supabase → Storage → rv-media → Edit → remove MIME type restriction (or add application/octet-stream). Required for document uploads to fully work. | ⏳ Roland action |
 | ✅ | — | **Run SQL migration for Parts Request** | `has_open_parts_request BOOLEAN` column confirmed present in `repair_orders` table | ✅ Done |
 | ✅ | — | **Redeploy send-quote-email Edge Function** | Confirmed deployed — 13 deployments, updated a day ago | ✅ Done |
 | 🟡 | — | **Create parts@patriotsrvservices.com** | Management email group for parts request notifications | ⏳ Roland action |
@@ -80,7 +81,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 
 | File | Version | Description |
 |---|---|---|
-| `index.html` | **v1.271** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments |
+| `index.html` | **v1.272** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments |
 | `checkin.html` | **v1.26** | Technician clock-in/out, offline-first IndexedDB queue |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
 | `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup, PDF quotes |
@@ -250,6 +251,7 @@ supabase functions deploy roof-lookup
 - ✅ **notes_type_check fix (v1.268)** — Changed parts request note insert from `type:'parts_request'` to `type:'ro_status'` with `🔩 PARTS REQUESTED:` body prefix; history query uses `.ilike('body', '%PARTS REQUESTED%')`
 - ✅ **Parts Request photo attachments (v1.269)** — `_partsRequestFiles[]` global array + `previewPartsPhotos/removePartsPhoto/renderPartsPhotoPreview` helpers; orange "📷 Attach / Take Photo(s)" button in modal; thumbnails with × remove; on submit uploads via `uploadToSupabaseStorage`, adds to RO `photo_library`, passes `photoUrls[]` to Edge Function; `send-quote-email` v1.3 embeds photos as inline clickable thumbnails in email HTML
 - ✅ **RO Description inline edit fix (v1.270)** — `showVoiceNotesModal` now accepts optional `prefillValue` param; modal pre-fills textarea with existing description, cursor placed at end; `editField` branches on `repairDescription`: full replace on save (not append), old value captured from `currentFilteredData` before mutation, `writeAuditLog` called with before/after; `roStatusNotes` and `customerCommunicationNotes` keep existing append + timestamp behavior
+- ✅ **Document upload MIME fix (v1.272)** — `uploadToSupabaseStorage` accepts `skipContentType` option; `uploadDocument` passes `skipContentType:true` to bypass bucket MIME policy for non-image files; improved error message with fix instructions; Roland must also remove MIME restriction from rv-media bucket in Supabase dashboard
 - ✅ **Pre-deploy backup system** — `scripts/backup.sh` creates timestamped snapshots of all 6 key files in `.backups/`, keeps last 6 versions, runs before every push per End of Session Checklist
 - ✅ **Photo & document upload fix (v1.271)** — `uploadDocument` fully migrated from Google Drive (was using expired `accessToken` → 401) to Supabase Storage (`uploadToSupabaseStorage` → `addDocToLibrary`); `uploadPhoto` and `uploadDocument` guards changed from `!getSB()` to `!getSB() || !supabaseSession`; session re-check added inside async `onchange` callback; error message updated to "Session expired — please refresh"
 
@@ -273,6 +275,7 @@ supabase functions deploy roof-lookup
 | v1.269 | 2026-03-20 | Parts Request photo attachments — upload to Storage, add to photo_library, inline email thumbnails |
 | v1.270 | 2026-03-20 | RO Description inline edit — pre-fill modal with current content, full replace, before/after audit log |
 | v1.271 | 2026-03-20 | Fix photo & document uploads — uploadDocument migrated to Supabase Storage; supabaseSession guard on both upload paths |
+| v1.272 | 2026-03-22 | Fix document upload MIME rejection — skipContentType option on uploadToSupabaseStorage; document uploads bypass bucket MIME policy; improved error message |
 
 ---
 
