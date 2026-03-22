@@ -299,6 +299,7 @@ supabase functions deploy roof-lookup
 | v1.275 | 2026-03-22 | Photo lightbox viewer (tap to view/save, prev/next nav, Set as Main from viewer); Email photos to customer (send selected photos to RO customer email via Edge Function); Edge Function v1.4 adds photo_share type |
 | v1.276 | 2026-03-22 | Fix email photos auth — sendPhotosToCustomer uses SUPABASE_ANON_KEY (not session JWT); improved error handler |
 | v1.277 | 2026-03-22 | Spanish language toggle (GH#12) — globe button, TRANSLATIONS_ES dict, t() helper, translateStaticUI(), setupI18n(); full RO card + stats translation |
+| checkin v1.27 | 2026-03-22 | Spanish language toggle for checkin.html — same prvs_lang key, full check-in/out flow, auto clock-out modal, clock-out summary, offline banner translated |
 
 ---
 
