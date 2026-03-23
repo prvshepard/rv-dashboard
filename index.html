@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-    PRVS Dashboard v1.277
-    Released: 2026-03-22
+    PRVS Dashboard v1.278
+    Released: 2026-03-23
+    v1.278: Fix duplicate ro_id 409 crash — async generateUniqueROId() checks Supabase for collision before insert, appends -2/-3 suffix if needed; try/catch at submit handler gives user-visible error instead of silent failure
     v1.277: Spanish language toggle (GH#12) — globe button in header, TRANSLATIONS_ES dictionary, t() helper, translateStaticUI(), setupI18n(); all RO card UI strings, status dropdowns, urgency labels, info rows, buttons, section titles, and empty state translated; persists to localStorage
     v1.276: Fix email photos auth — switch from session access_token to SUPABASE_ANON_KEY (consistent with submitPartsRequest); improve error message to include result.message and HTTP status
     v1.275: Photo lightbox viewer (tap to view/save full size, prev/next nav, Set as Main); Email photos to customer from Photos modal; photo_share Edge Function type
@@ -2477,7 +2478,7 @@
             </div>
             <div style="text-align: right; margin-top: 8px; display:flex; justify-content:flex-end; align-items:center; gap:12px;">
                 <button id="langToggleBtn" onclick="setLang(getLang()==='es'?'en':'es')" title="Toggle Spanish / English" style="background:transparent;border:1px solid #d1d5db;border-radius:6px;padding:3px 10px;font-size:0.75rem;color:#6b7280;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:0.03em;">🌐 ES</button>
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.277</span>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.278</span>
             </div>
         </header>
 
@@ -6062,7 +6063,7 @@ Notes: ${notes}` : '',
 
         // Initialize
         function init() {
-            console.log('📦 PRVS Dashboard v1.277 - Released 2026-03-22');
+            console.log('📦 PRVS Dashboard v1.278 - Released 2026-03-23');
 
             // Auto-fill saved Anthropic API key into both scan inputs
             const savedAnthropicKey = localStorage.getItem('prvs_anthropic_key');
@@ -8274,7 +8275,8 @@ Notes: ${notes}` : '',
 
         // Append new RO to Supabase
         async function appendToSupabase(formData) {
-            const roId = generateROId(formData.customerName, formData.rv || '', new Date().toISOString().slice(0,10));
+            const today = new Date().toISOString().slice(0, 10);
+            const roId = await generateUniqueROId(formData.customerName, formData.rv || '', today);
 
             const { data, error } = await getSB().from('repair_orders').insert({
                 ro_id:          roId,
@@ -8871,6 +8873,31 @@ Notes: ${notes}` : '',
             }
             const hex = Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
             return `PRVS-${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
+        }
+
+        // Generates a unique ro_id, checking Supabase for collisions and appending -2/-3/etc. if needed.
+        // Prevents 409 Conflict errors when the same customer+RV is created more than once on the same day,
+        // or on the rare occasion of a 32-bit hash collision between two different ROs.
+        async function generateUniqueROId(customerName, rv, dateStr) {
+            const base = generateROId(customerName, rv, dateStr);
+            const { data: existing } = await getSB()
+                .from('repair_orders')
+                .select('ro_id')
+                .eq('ro_id', base)
+                .maybeSingle();
+            if (!existing) return base; // No collision — use as-is
+            // Collision — try base-2 through base-9
+            for (let i = 2; i <= 9; i++) {
+                const candidate = `${base}-${i}`;
+                const { data: taken } = await getSB()
+                    .from('repair_orders')
+                    .select('ro_id')
+                    .eq('ro_id', candidate)
+                    .maybeSingle();
+                if (!taken) return candidate;
+            }
+            // Extreme edge case: all suffixes taken — append timestamp
+            return `${base}-${Date.now().toString(36).toUpperCase().slice(-4)}`;
         }
 
         // Backfill roId for any RO that doesn't have one, writing to column U in the sheet
@@ -9997,7 +10024,14 @@ Notes: ${notes}` : '',
                 data.repairType = repairTypes.join(', ');
                 if (data.vin) data.vin = data.vin.toUpperCase();
 
-                const success = await appendToSheets(data);
+                let success = false;
+                try {
+                    success = await appendToSheets(data);
+                } catch (err) {
+                    console.error('New RO save error:', err);
+                    alert('Error saving Repair Order: ' + (err.message || JSON.stringify(err)));
+                    return;
+                }
                 if (success) {
                     // Merge insurance fields + scan data, write to Insurance Data tab + Column W
                     const insuranceFields = collectInsuranceFields();
