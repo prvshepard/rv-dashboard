@@ -72,7 +72,8 @@ Claude must complete ALL of these before the session ends (context limit, user s
 | ✅ | — | **GitHub Release v1.277** | Published by Roland | ✅ Done |
 | ✅ | — | **GitHub Release v1.278** | Published | ✅ Done |
 | ✅ | — | **GitHub Release v1.279** | Published | ✅ Done |
-| 🟡 | — | **GitHub Release v1.282** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.282 | ⏳ Roland action |
+| 🟡 | — | **GitHub Release v1.282b** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.282b | ⏳ Roland action |
+| 🟡 | — | **Confirm Merge Dupes button visible** | After hard refresh, should see 🔗 Dupe check log in console and button to the right of 📊 Analytics if dupes exist | ⏳ Roland verify |
 | ✅ | — | **Fix Supabase rv-media bucket MIME types** | Roland confirmed bucket MIME list updated to include docx, xlsx, pptx, pdf, text, octet-stream | ✅ Done |
 | ✅ | — | **Redeploy send-quote-email Edge Function v1.4** | photo_share type + CC repair@ on all emails — confirmed deployed | ✅ Done |
 | ✅ | — | **Run SQL migration for Parts Request** | `has_open_parts_request BOOLEAN` column confirmed present in `repair_orders` table | ✅ Done |
@@ -85,7 +86,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 
 | File | Version | Description |
 |---|---|---|
-| `index.html` | **v1.282** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments, photo lightbox viewer, email photos to customer, Spanish language toggle, video upload support, duplicate RO manager |
+| `index.html` | **v1.282b** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments, photo lightbox viewer, email photos to customer, Spanish language toggle, video upload support, duplicate RO manager (Admin, isAdmin timing fix) |
 | `checkin.html` | **v1.27** | Technician clock-in/out, offline-first IndexedDB queue, Spanish language toggle |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
 | `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup, PDF quotes |
@@ -172,6 +173,11 @@ Claude must complete ALL of these before the session ends (context limit, user s
 - **Emoji keys** — dict keys for some buttons include the emoji (e.g. `'🖨️ Print Label'`, `'🚪 Tech Check In'`, `'✏️ Edit RO'`). The emoji MUST be inside the `t()` call: `${t('🖨️ Print Label')}` NOT `🖨️ ${t('Print Label')}`.
 - **DB values stay English** — status dropdown `value=""` attributes must remain English; only the displayed option text is wrapped with `t()`.
 - **checkin.html** — Spanish toggle NOT yet applied to checkin.html (still open).
+
+### `isAdmin()` Timing Bug (v1.282b)
+- **Root cause:** `getUserInfo()` is called during `init()` even when no Google access token exists. With no token, it sets `currentUser = { email: 'unknown@user.com' }`. The session restore path has `if (!currentUser)` guard — which is `false` (currentUser is truthy) — so it never overwrites `currentUser` with the real email from the Supabase session. Result: `isAdmin()` checks `currentUser.email === 'unknown@user.com'` and returns `false`, even for real admins.
+- **Fix pattern:** Any code that needs to check admin status after page load should do BOTH: `isAdmin() || ADMIN_EMAILS.includes((supabaseSession?.user?.email || '').toLowerCase())`. Do NOT rely on `isAdmin()` alone in post-load callbacks.
+- **Affected areas:** Duplicate RO Manager post-load check. Any future feature that gates Admin UI based on role should use the same pattern.
 
 ### Pre-Deploy Backup System
 - **Always run `bash scripts/backup.sh` before `git push origin main`** — this is step 7 of the End of Session Checklist
@@ -284,6 +290,9 @@ supabase functions deploy roof-lookup
 - ✅ **Duplicate ro_id 409 fix (v1.278)** — `generateROId()` is a deterministic 32-bit hash; same customer+RV+date (or any hash collision) produced identical IDs causing a Supabase 409 Conflict on insert. Added `async generateUniqueROId(name, rv, date)` which calls `generateROId()` then checks Supabase with `.maybeSingle()` before committing — if collision detected, appends `-2` through `-9`, then falls back to a base-36 timestamp suffix. Updated `appendToSupabase` to `await generateUniqueROId()`. Added try/catch at the New RO form submit handler so errors produce a user-visible alert instead of a silent uncaught promise rejection.
 - ✅ **Video upload support (v1.279)** — Added `isVideoUrl(url)` helper (checks .mp4/.mov/.avi/.mkv/.webm/.m4v/.3gp extensions). `uploadPhoto` now accepts `image/*,video/*` and the image-only `continue` filter was widened to allow `video/` MIME types. Thumbnail grid renders a dark `🎬 VIDEO` tile for video URLs instead of a broken `<img>`. Lightbox renders `<video controls autoplay>` for videos and suppresses "Set as Main" (videos can't be an RO's main photo). Email modal shows videos as disabled/non-checkable with a `🎬 Video (not emailable)` label. "Add New Photo" button renamed "Add Photo / Video".
 - ✅ **Fix RO insert race condition (v1.280)** — Replaced check-then-insert pattern (`generateUniqueROId` with pre-SELECT) with optimistic insert loop (`generateROIdCandidates` returns base + -2..-9 + timestamp fallback). `appendToSupabase` now tries each candidate in sequence; on `error.code === '23505'` it advances to the next; any other error is re-thrown. Eliminates the TOCTOU race where concurrent submits could both pass the pre-check and both fail on insert. Also added submit button disable/re-enable around the save call to prevent double-submissions.
+- ✅ **Fix roId scope bug (v1.281)** — `appendToSupabase` optimistic insert loop used `for (const roId of candidates)`; the `console.log` after the loop referenced `roId` which is block-scoped to the loop body, causing `ReferenceError: roId is not defined`. Fixed by changing `console.log('✅ New RO saved:', roId)` to `console.log('✅ New RO saved:', data.ro_id)`.
+- ✅ **Duplicate RO Manager (v1.282)** — `getBaseROId(roId)` strips `-2`/`-3`/`-XXXX` suffixes via regex to find the base PRVS hash. `findDuplicateGroups()` groups `currentData` by base ID and returns groups with 2+ members. Admin-only `🔗 Merge Dupes` button in header (hidden until dupes detected) with red badge count. `openDuplicateManager()` modal shows each group with radio buttons to pick the master RO. `executeDupeMerge()` reassigns foreign keys on `notes`, `parts`, `time_logs`, `insurance_scans`, `audit_log` tables; merges `photo_library` arrays; copies `rvPhotoUrl` from duplicate to master if master has none; DELETEs duplicate `repair_orders` rows; reloads data.
+- ✅ **Fix isAdmin() timing bug for Merge Dupes button (v1.282b)** — `getUserInfo()` called with no Google token sets `currentUser = { email: 'unknown@user.com' }`. The `if (!currentUser)` guard in session restore then skips overwriting it with the real email. `isAdmin()` checks `currentUser.email` which is wrong. Fix: post-load dupe check now also checks `supabaseSession?.user?.email` directly against `ADMIN_EMAILS` (`const _sessionEmail = (supabaseSession?.user?.email || '').toLowerCase(); const _isAdminNow = isAdmin() || ADMIN_EMAILS.includes(_sessionEmail)`). Added `console.log('🔗 Dupe check: X duplicate(s) found, button shown/hidden')` for debugging.
 
 ---
 
@@ -316,6 +325,7 @@ supabase functions deploy roof-lookup
 | v1.280 | 2026-03-23 | Fix RO insert race condition — optimistic insert loop replaces check-then-insert; 23505 → auto-retry next suffix; submit button disabled during save |
 | v1.281 | 2026-03-23 | Fix roId scope bug — console.log after insert loop used block-scoped loop var; changed to data.ro_id |
 | v1.282 | 2026-03-23 | Duplicate RO Manager — Admin-only 🔗 Merge Dupes button with badge count; modal groups dupes by base PRVS hash; pick master per group; merge notes/parts/time_logs/insurance_scans/audit_log FKs + photo_library; delete duplicates |
+| v1.282b | 2026-03-23 | Fix isAdmin() timing bug — Merge Dupes button wasn't showing because getUserInfo() pollutes currentUser.email; post-load dupe check now also checks supabaseSession?.user?.email against ADMIN_EMAILS directly |
 | checkin v1.27 | 2026-03-22 | Spanish language toggle for checkin.html — same prvs_lang key, full check-in/out flow, auto clock-out modal, clock-out summary, offline banner translated |
 
 ---
@@ -340,3 +350,4 @@ supabase functions deploy roof-lookup
 | 2026-03-23 | 14 | v1.278 — Fixed duplicate ro_id 409 crash: generateUniqueROId() collision check + -2/-3 suffix fallback; try/catch at New RO submit handler. GitHub Release v1.277 confirmed published by Roland. |
 | 2026-03-23 | 15 | v1.279 — Video upload support restored: isVideoUrl() helper, uploadPhoto accepts video/*, 🎬 tile in thumbnail grid, <video controls> in lightbox, email modal disables video entries. |
 | 2026-03-23 | 16 | v1.280 — Fix RO insert race condition: optimistic insert loop replaces generateUniqueROId check-then-insert; 23505 → retry next candidate; submit button disabled during save. v1.281 — Fix roId scope bug: console.log after loop used out-of-scope loop var; changed to data.ro_id. v1.282 — Duplicate RO Manager: getBaseROId/findDuplicateGroups, 🔗 Merge Dupes header button, master picker modal, executeDupeMerge reassigns all FK tables + merges photo_library + deletes dupes. |
+| 2026-03-23 | 17 | v1.282b — Fix isAdmin() timing bug: getUserInfo() with no Google token pollutes currentUser.email to 'unknown@user.com'; Merge Dupes post-load check now also checks supabaseSession?.user?.email against ADMIN_EMAILS directly; added 🔗 Dupe check console.log for debugging. End of Session Checklist run; backup.sh executed; CLAUDE_CONTEXT.md updated and pushed. |
