@@ -72,7 +72,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 | ✅ | — | **GitHub Release v1.277** | Published by Roland | ✅ Done |
 | ✅ | — | **GitHub Release v1.278** | Published | ✅ Done |
 | ✅ | — | **GitHub Release v1.279** | Published | ✅ Done |
-| 🟡 | — | **GitHub Release v1.281** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.281 | ⏳ Roland action |
+| 🟡 | — | **GitHub Release v1.282** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.282 | ⏳ Roland action |
 | ✅ | — | **Fix Supabase rv-media bucket MIME types** | Roland confirmed bucket MIME list updated to include docx, xlsx, pptx, pdf, text, octet-stream | ✅ Done |
 | ✅ | — | **Redeploy send-quote-email Edge Function v1.4** | photo_share type + CC repair@ on all emails — confirmed deployed | ✅ Done |
 | ✅ | — | **Run SQL migration for Parts Request** | `has_open_parts_request BOOLEAN` column confirmed present in `repair_orders` table | ✅ Done |
@@ -85,7 +85,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 
 | File | Version | Description |
 |---|---|---|
-| `index.html` | **v1.281** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments, photo lightbox viewer, email photos to customer, Spanish language toggle, video upload support |
+| `index.html` | **v1.282** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments, photo lightbox viewer, email photos to customer, Spanish language toggle, video upload support, duplicate RO manager |
 | `checkin.html` | **v1.27** | Technician clock-in/out, offline-first IndexedDB queue, Spanish language toggle |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
 | `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup, PDF quotes |
@@ -315,6 +315,7 @@ supabase functions deploy roof-lookup
 | v1.279 | 2026-03-23 | Video upload support — isVideoUrl() helper; Photos tab accepts video/*; 🎬 tile in grid; <video controls> in lightbox; email modal disables videos |
 | v1.280 | 2026-03-23 | Fix RO insert race condition — optimistic insert loop replaces check-then-insert; 23505 → auto-retry next suffix; submit button disabled during save |
 | v1.281 | 2026-03-23 | Fix roId scope bug — console.log after insert loop used block-scoped loop var; changed to data.ro_id |
+| v1.282 | 2026-03-23 | Duplicate RO Manager — Admin-only 🔗 Merge Dupes button with badge count; modal groups dupes by base PRVS hash; pick master per group; merge notes/parts/time_logs/insurance_scans/audit_log FKs + photo_library; delete duplicates |
 | checkin v1.27 | 2026-03-22 | Spanish language toggle for checkin.html — same prvs_lang key, full check-in/out flow, auto clock-out modal, clock-out summary, offline banner translated |
 
 ---
@@ -338,4 +339,4 @@ supabase functions deploy roof-lookup
 | 2026-03-22 | 13 | v1.276 email auth fix (SUPABASE_ANON_KEY). Edge Function v1.4 CC on photo emails deployed. v1.277 Spanish toggle (GH#12) complete for index.html — TRANSLATIONS_ES dict, t(), translateStaticUI(), setupI18n(), full renderBoard() + updateStats() translation. v1.27 Spanish toggle for checkin.html — full check-in/out flow translated, same prvs_lang localStorage key. |
 | 2026-03-23 | 14 | v1.278 — Fixed duplicate ro_id 409 crash: generateUniqueROId() collision check + -2/-3 suffix fallback; try/catch at New RO submit handler. GitHub Release v1.277 confirmed published by Roland. |
 | 2026-03-23 | 15 | v1.279 — Video upload support restored: isVideoUrl() helper, uploadPhoto accepts video/*, 🎬 tile in thumbnail grid, <video controls> in lightbox, email modal disables video entries. |
-| 2026-03-23 | 16 | v1.280 — Fix RO insert race condition: optimistic insert loop replaces generateUniqueROId check-then-insert; 23505 → retry next candidate; submit button disabled during save. v1.281 — Fix roId scope bug: console.log after loop used out-of-scope loop var; changed to data.ro_id. |
+| 2026-03-23 | 16 | v1.280 — Fix RO insert race condition: optimistic insert loop replaces generateUniqueROId check-then-insert; 23505 → retry next candidate; submit button disabled during save. v1.281 — Fix roId scope bug: console.log after loop used out-of-scope loop var; changed to data.ro_id. v1.282 — Duplicate RO Manager: getBaseROId/findDuplicateGroups, 🔗 Merge Dupes header button, master picker modal, executeDupeMerge reassigns all FK tables + merges photo_library + deletes dupes. |
