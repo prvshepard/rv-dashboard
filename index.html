@@ -8218,6 +8218,16 @@ Notes: ${notes}` : '',
                 console.log('✅ Parts loaded for', Object.keys(partsData).length, 'ROs');
                 updatePartsJsonOnData();
                 renderBoard();
+
+                // Refresh Merge Dupes button visibility now that currentData is populated
+                if (isAdmin()) {
+                    const dupeGroups = findDuplicateGroups();
+                    const dupeCount = dupeGroups.reduce((sum, g) => sum + g.length - 1, 0);
+                    const dupesBtn = document.getElementById('manageDupesBtn');
+                    const badge = document.getElementById('dupesCount');
+                    if (dupesBtn) dupesBtn.style.display = dupeCount > 0 ? 'inline-block' : 'none';
+                    if (badge) badge.textContent = dupeCount;
+                }
             } catch(e) {
                 console.warn('Could not load parts from Supabase:', e);
             }
