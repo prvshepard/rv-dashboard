@@ -70,7 +70,8 @@ Claude must complete ALL of these before the session ends (context limit, user s
 | ✅ | — | **Deploy roof-lookup Edge Function** | Confirmed deployed — 5 deployments, updated 2 days ago | ✅ Done |
 | ✅ | — | **Test calendar re-auth on iPhone** | Full mobile OAuth round-trip flow — confirm Schedule modal reopens after auth | ✅ Done |
 | ✅ | — | **GitHub Release v1.277** | Published by Roland | ✅ Done |
-| 🟡 | — | **GitHub Release v1.278** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.278 | ⏳ Roland action |
+| ✅ | — | **GitHub Release v1.278** | Published | ✅ Done |
+| 🟡 | — | **GitHub Release v1.279** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.279 | ⏳ Roland action |
 | ✅ | — | **Fix Supabase rv-media bucket MIME types** | Roland confirmed bucket MIME list updated to include docx, xlsx, pptx, pdf, text, octet-stream | ✅ Done |
 | ✅ | — | **Redeploy send-quote-email Edge Function v1.4** | photo_share type + CC repair@ on all emails — confirmed deployed | ✅ Done |
 | ✅ | — | **Run SQL migration for Parts Request** | `has_open_parts_request BOOLEAN` column confirmed present in `repair_orders` table | ✅ Done |
@@ -83,7 +84,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 
 | File | Version | Description |
 |---|---|---|
-| `index.html` | **v1.278** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments, photo lightbox viewer, email photos to customer, Spanish language toggle |
+| `index.html` | **v1.279** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments, photo lightbox viewer, email photos to customer, Spanish language toggle, video upload support |
 | `checkin.html` | **v1.27** | Technician clock-in/out, offline-first IndexedDB queue, Spanish language toggle |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
 | `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup, PDF quotes |
@@ -279,6 +280,7 @@ supabase functions deploy roof-lookup
 - ✅ **Spanish language toggle (v1.277, GH#12 — index.html)** — Globe toggle button (🌐 ES / 🌐 EN) in header; `TRANSLATIONS_ES` dictionary (~70 key/value pairs); `t(str)` helper (English key → Spanish or fallback); `getLang()`/`setLang()` reading/writing `prvs_lang` in localStorage; `translateStaticUI()` updates all `[data-i18n]` DOM elements and `[data-i18n-ph]` placeholders; `setupI18n()` tags static header/filter DOM elements at init() time; all RO card strings wrapped with `t()`: urgency options, status dropdown, info labels (Type/RV/VIN/Tech/Phone/Email/Address), section titles, placeholder texts, button labels, parts badges, insurance badges, QR section, time logs; `updateStats()` "RVs on Lot" translated; `setupI18n()` called via `setTimeout` at end of `init()`
 - ✅ **Spanish language toggle (v1.27, GH#12 — checkin.html)** — Same `prvs_lang` localStorage key (shared with index.html); globe button in logo area; `TRANSLATIONS_ES` dict covering all check-in/out UI: RO info labels, clocked-in/out badges, timer header, service type section, work notes/dictation, action buttons, clock-out summary, auto clock-out modal, offline banner; `translateStaticUI()` called at DOMContentLoaded; `setLang()` triggers `render()` if already loaded
 - ✅ **Duplicate ro_id 409 fix (v1.278)** — `generateROId()` is a deterministic 32-bit hash; same customer+RV+date (or any hash collision) produced identical IDs causing a Supabase 409 Conflict on insert. Added `async generateUniqueROId(name, rv, date)` which calls `generateROId()` then checks Supabase with `.maybeSingle()` before committing — if collision detected, appends `-2` through `-9`, then falls back to a base-36 timestamp suffix. Updated `appendToSupabase` to `await generateUniqueROId()`. Added try/catch at the New RO form submit handler so errors produce a user-visible alert instead of a silent uncaught promise rejection.
+- ✅ **Video upload support (v1.279)** — Added `isVideoUrl(url)` helper (checks .mp4/.mov/.avi/.mkv/.webm/.m4v/.3gp extensions). `uploadPhoto` now accepts `image/*,video/*` and the image-only `continue` filter was widened to allow `video/` MIME types. Thumbnail grid renders a dark `🎬 VIDEO` tile for video URLs instead of a broken `<img>`. Lightbox renders `<video controls autoplay>` for videos and suppresses "Set as Main" (videos can't be an RO's main photo). Email modal shows videos as disabled/non-checkable with a `🎬 Video (not emailable)` label. "Add New Photo" button renamed "Add Photo / Video".
 
 ---
 
@@ -307,6 +309,7 @@ supabase functions deploy roof-lookup
 | v1.276 | 2026-03-22 | Fix email photos auth — sendPhotosToCustomer uses SUPABASE_ANON_KEY (not session JWT); improved error handler |
 | v1.277 | 2026-03-22 | Spanish language toggle (GH#12) — globe button, TRANSLATIONS_ES dict, t() helper, translateStaticUI(), setupI18n(); full RO card + stats translation |
 | v1.278 | 2026-03-23 | Fix duplicate ro_id 409 crash — generateUniqueROId() checks for collision before insert, appends -2/-3 suffix; try/catch at submit handler for user-visible errors |
+| v1.279 | 2026-03-23 | Video upload support — isVideoUrl() helper; Photos tab accepts video/*; 🎬 tile in grid; <video controls> in lightbox; email modal disables videos |
 | checkin v1.27 | 2026-03-22 | Spanish language toggle for checkin.html — same prvs_lang key, full check-in/out flow, auto clock-out modal, clock-out summary, offline banner translated |
 
 ---
@@ -329,3 +332,4 @@ supabase functions deploy roof-lookup
 | 2026-03-22 | 12 | Added GH#12 (Spanish toggle), GH#13 (pre-deploy backup). Built scripts/backup.sh (6-version rotating snapshots). SESSION_STARTER.md overhauled (hardened rules, GitHub fallback path, RESET/PAUSE/STOP commands, Key Reference table). PRVS_Technician_Guide.docx created. v1.272 MIME fix. v1.273 document modal refresh fix. v1.274 60-second note. v1.275 photo lightbox viewer + email photos to customer + Edge Function v1.4 photo_share type. Context limit hit — session ended mid-work. |
 | 2026-03-22 | 13 | v1.276 email auth fix (SUPABASE_ANON_KEY). Edge Function v1.4 CC on photo emails deployed. v1.277 Spanish toggle (GH#12) complete for index.html — TRANSLATIONS_ES dict, t(), translateStaticUI(), setupI18n(), full renderBoard() + updateStats() translation. v1.27 Spanish toggle for checkin.html — full check-in/out flow translated, same prvs_lang localStorage key. |
 | 2026-03-23 | 14 | v1.278 — Fixed duplicate ro_id 409 crash: generateUniqueROId() collision check + -2/-3 suffix fallback; try/catch at New RO submit handler. GitHub Release v1.277 confirmed published by Roland. |
+| 2026-03-23 | 15 | v1.279 — Video upload support restored: isVideoUrl() helper, uploadPhoto accepts video/*, 🎬 tile in thumbnail grid, <video controls> in lightbox, email modal disables video entries. |
