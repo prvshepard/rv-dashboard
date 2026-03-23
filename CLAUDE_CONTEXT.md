@@ -73,7 +73,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 | ✅ | — | **GitHub Release v1.278** | Published | ✅ Done |
 | ✅ | — | **GitHub Release v1.279** | Published | ✅ Done |
 | 🟡 | — | **GitHub Release v1.282b** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.282b | ⏳ Roland action |
-| 🟡 | — | **Confirm Merge Dupes button visible** | After hard refresh, should see 🔗 Dupe check log in console and button to the right of 📊 Analytics if dupes exist | ⏳ Roland verify |
+| ✅ | — | **Confirm Merge Dupes button visible** | Confirmed working — button appears and merge flow executes correctly | ✅ Done |
 | ✅ | — | **Fix Supabase rv-media bucket MIME types** | Roland confirmed bucket MIME list updated to include docx, xlsx, pptx, pdf, text, octet-stream | ✅ Done |
 | ✅ | — | **Redeploy send-quote-email Edge Function v1.4** | photo_share type + CC repair@ on all emails — confirmed deployed | ✅ Done |
 | ✅ | — | **Run SQL migration for Parts Request** | `has_open_parts_request BOOLEAN` column confirmed present in `repair_orders` table | ✅ Done |
