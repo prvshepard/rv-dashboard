@@ -8219,14 +8219,19 @@ Notes: ${notes}` : '',
                 updatePartsJsonOnData();
                 renderBoard();
 
-                // Refresh Merge Dupes button visibility now that currentData is populated
-                if (isAdmin()) {
+                // Refresh Merge Dupes button — isAdmin() may return false here if currentUser
+                // was set to 'unknown@user.com' before the Supabase session email arrived,
+                // so also check supabaseSession.user.email directly as a reliable fallback.
+                const _sessionEmail = (supabaseSession?.user?.email || '').toLowerCase();
+                const _isAdminNow = isAdmin() || ADMIN_EMAILS.includes(_sessionEmail);
+                if (_isAdminNow) {
                     const dupeGroups = findDuplicateGroups();
                     const dupeCount = dupeGroups.reduce((sum, g) => sum + g.length - 1, 0);
                     const dupesBtn = document.getElementById('manageDupesBtn');
                     const badge = document.getElementById('dupesCount');
                     if (dupesBtn) dupesBtn.style.display = dupeCount > 0 ? 'inline-block' : 'none';
                     if (badge) badge.textContent = dupeCount;
+                    console.log(`🔗 Dupe check: ${dupeCount} duplicate(s) found, button ${dupeCount > 0 ? 'shown' : 'hidden'}`);
                 }
             } catch(e) {
                 console.warn('Could not load parts from Supabase:', e);
