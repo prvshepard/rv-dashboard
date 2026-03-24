@@ -57,6 +57,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 |---|---|---|---|---|
 | 🔴 | GH#1 | **Start Twilio number port** | Port existing number — blocks all SMS features | ⏳ Open |
 | 🟠 | GH#4 | **Twilio SMS v1.27** | Customer + tech notifications via SMS | ⏳ Open |
+| 🟠 | GH#14 | **Parts chip states — Sourcing / Outstanding / Received** | Three distinct states visible on RO tile: 🔍 Part Sourcing (actively hunting for parts), 🟡 Parts Outstanding (ordered, awaiting delivery), ✅ Parts Received (all parts in). Currently "Parts Outstanding" chip never clears when parts arrive — marking parts received must flip chip to "Parts Received" and clear the outstanding indicator. Replace/extend existing `has_open_parts_request` boolean with a `parts_status` field (enum: null, 'sourcing', 'outstanding', 'received'). Chip colors should differentiate states clearly. | ⏳ Open |
 | 🟠 | GH#5 | **Work Assignment System** | Assign ROs to specific technicians | ⏳ Open |
 | 🟠 | GH#6 | **Employee Time Clock** | Full time clock feature in dashboard | ⏳ Open |
 | 🔴 | GH#10 | **Kenect API integration** | Pull customer conversation threads into RO view — blocked on Roland getting API credentials from Kenect support | ⏳ Roland action |
