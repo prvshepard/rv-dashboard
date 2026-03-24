@@ -57,7 +57,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 |---|---|---|---|---|
 | 🔴 | GH#1 | **Start Twilio number port** | Port existing number — blocks all SMS features | ⏳ Open |
 | 🟠 | GH#4 | **Twilio SMS v1.27** | Customer + tech notifications via SMS | ⏳ Open |
-| 🟠 | GH#14 | **Parts chip states — Sourcing / Outstanding / Received** | Three distinct states visible on RO tile: 🔍 Part Sourcing (actively hunting for parts), 🟡 Parts Outstanding (ordered, awaiting delivery), ✅ Parts Received (all parts in). Currently "Parts Outstanding" chip never clears when parts arrive — marking parts received must flip chip to "Parts Received" and clear the outstanding indicator. Replace/extend existing `has_open_parts_request` boolean with a `parts_status` field (enum: null, 'sourcing', 'outstanding', 'received'). Chip colors should differentiate states clearly. | ⏳ Open |
+| ✅ | GH#14 | **Parts chip states — Sourcing / Outstanding / Received / Estimate** | Four-state system: 🔍 Part Sourcing (neon orange), ⚠️ Parts Outstanding (yellow), ✅ Parts Received (green), 📋 Parts Estimate (blue, pulsing). `parts_status` column on `repair_orders`. Auto-flip to Received when all parts marked received. Manager/Admin set status modal. For Estimate Only toggle in Request Parts modal. Filter buttons for all four states. bobby@, solar@, brandon@ added to MANAGER_EMAILS + Supabase. | ✅ Done v1.284–v1.285 |
 | 🟠 | GH#5 | **Work Assignment System** | Assign ROs to specific technicians | ⏳ Open |
 | 🟠 | GH#6 | **Employee Time Clock** | Full time clock feature in dashboard | ⏳ Open |
 | 🔴 | GH#10 | **Kenect API integration** | Pull customer conversation threads into RO view — blocked on Roland getting API credentials from Kenect support | ⏳ Roland action |
@@ -74,6 +74,8 @@ Claude must complete ALL of these before the session ends (context limit, user s
 | ✅ | — | **GitHub Release v1.278** | Published | ✅ Done |
 | ✅ | — | **GitHub Release v1.279** | Published | ✅ Done |
 | 🟡 | — | **GitHub Release v1.283** | Create release at github.com/PatriotsRV/rv-dashboard/releases/new — tag v1.283 | ⏳ Roland action |
+| 🟡 | — | **GitHub Release v1.284** | Create formal release at github.com/PatriotsRV/rv-dashboard/releases/new — tag `v1.284` already exists | ⏳ Roland action |
+| 🟡 | — | **GitHub Release v1.285** | Create formal release at github.com/PatriotsRV/rv-dashboard/releases/new — tag `v1.285` already exists, release notes in `.github/releases/v1.285-notes.md` | ⏳ Roland action |
 | ✅ | — | **Confirm Merge Dupes button visible** | Confirmed working — button appears and merge flow executes correctly | ✅ Done |
 | ✅ | — | **Fix Supabase rv-media bucket MIME types** | Roland confirmed bucket MIME list updated to include docx, xlsx, pptx, pdf, text, octet-stream | ✅ Done |
 | ✅ | — | **Redeploy send-quote-email Edge Function v1.4** | photo_share type + CC repair@ on all emails — confirmed deployed | ✅ Done |
@@ -87,7 +89,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 
 | File | Version | Description |
 |---|---|---|
-| `index.html` | **v1.283** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments, photo lightbox viewer, email photos to customer, Spanish language toggle, video upload support, duplicate RO manager (Admin), Date RV Arrived on Lot save fix |
+| `index.html` | **v1.285** | Main dashboard — ROs, time tracking, parts, calendar, audit log, parts request system with photo attachments, photo lightbox viewer, email photos to customer, Spanish language toggle, video upload support, duplicate RO manager (Admin), Date RV Arrived on Lot save fix, four-state parts chip system (Sourcing/Outstanding/Received/Estimate), For Estimate Only toggle, Manager role expanded |
 | `checkin.html` | **v1.27** | Technician clock-in/out, offline-first IndexedDB queue, Spanish language toggle |
 | `analytics.html` | **v1.0** | Analytics/reporting view |
 | `solar.html` | **v2.0** | Solar installation tracking — React 18, roof planner, AI lookup, PDF quotes |
@@ -95,6 +97,7 @@ Claude must complete ALL of these before the session ends (context limit, user s
 | `supabase/functions/send-quote-email/index.ts` | **v1.4** | Edge Function — solar quote email + parts request email + photo share email (types: 'solar_quote', 'parts_request', 'photo_share') |
 | `scripts/backup.sh` | — | Pre-deploy backup script — 6-version rolling snapshots of all key files |
 | `CLAUDE_CONTEXT.md` | — | This file — session continuity |
+| `ROLLBACK.md` | — | Emergency rollback guide — step-by-step restore instructions, version table, rollback commands |
 | `SESSION_STARTER.md` | — | Copyable session kickoff prompt for Roland to paste into Claude |
 | `RELEASE_NOTES_v1.265.md` | — | Release notes for v1.265 |
 | `RELEASE_NOTES_v1.266.md` | — | Release notes for v1.266 |
@@ -179,6 +182,19 @@ Claude must complete ALL of these before the session ends (context limit, user s
 - **Root cause:** `getUserInfo()` is called during `init()` even when no Google access token exists. With no token, it sets `currentUser = { email: 'unknown@user.com' }`. The session restore path has `if (!currentUser)` guard — which is `false` (currentUser is truthy) — so it never overwrites `currentUser` with the real email from the Supabase session. Result: `isAdmin()` checks `currentUser.email === 'unknown@user.com'` and returns `false`, even for real admins.
 - **Fix pattern:** Any code that needs to check admin status after page load should do BOTH: `isAdmin() || ADMIN_EMAILS.includes((supabaseSession?.user?.email || '').toLowerCase())`. Do NOT rely on `isAdmin()` alone in post-load callbacks.
 - **Affected areas:** Duplicate RO Manager post-load check. Any future feature that gates Admin UI based on role should use the same pattern.
+
+### Inline `</script>` Tag Inside Template Literal — Parser Bomb
+- If `modal.innerHTML = \`...\`` contains a literal `</script>` tag (e.g. an inline `<script>...</script>` block), the HTML parser treats it as closing the **outer** `<script>` block. Everything after that point is not parsed as JS.
+- Symptom: `Uncaught SyntaxError: Unexpected end of input` at the line where the outer script block would normally close + all global functions defined below that point become "not defined".
+- **Fix:** Never put inline `<script>` blocks inside template literals assigned to `.innerHTML`. Move any JS logic to a globally-scoped named function and wire it via `onchange="myFunction()"` or `onclick="myFunction()"` attributes instead.
+- Real example: `syncEstimateToggle()` was originally an inline `<script>` inside `openPartsStatusModal`'s `modal.innerHTML` — caused `gapiLoaded is not defined` and broke the entire page (v1.285 first attempt).
+
+### Direct Pushes to main During Active Session — Causes Branch Divergence
+- When Claude is in an active session editing `index.html`, our local git state is "ahead" of GitHub by our uncommitted/unpushed changes.
+- If Roland pushes directly to GitHub during that window (e.g. backup restore, hotfix from GitHub web UI), the remote branch gets new commits that our local branch doesn't have. Claude's next `git push` is then rejected.
+- **Recovery cost is high** — requires `git reset --hard origin/main` which discards all local session work, then full re-application of all changes from scratch.
+- **Rule:** Never push directly to GitHub while a Claude session is active. If a restore is needed urgently, tell Claude at the **start of the next session** before any files are touched — Claude will `git pull` first.
+- **Better alternative to direct pushes:** Use `ROLLBACK.md` commands or just start a new Claude session and say "roll back to vX.XXX".
 
 ### Pre-Deploy Backup System
 - **Always run `bash scripts/backup.sh` before `git push origin main`** — this is step 7 of the End of Session Checklist
@@ -295,6 +311,9 @@ supabase functions deploy roof-lookup
 - ✅ **Duplicate RO Manager (v1.282)** — `getBaseROId(roId)` strips `-2`/`-3`/`-XXXX` suffixes via regex to find the base PRVS hash. `findDuplicateGroups()` groups `currentData` by base ID and returns groups with 2+ members. Admin-only `🔗 Merge Dupes` button in header (hidden until dupes detected) with red badge count. `openDuplicateManager()` modal shows each group with radio buttons to pick the master RO. `executeDupeMerge()` reassigns foreign keys on `notes`, `parts`, `time_logs`, `insurance_scans`, `audit_log` tables; merges `photo_library` arrays; copies `rvPhotoUrl` from duplicate to master if master has none; DELETEs duplicate `repair_orders` rows; reloads data.
 - ✅ **Fix isAdmin() timing bug for Merge Dupes button (v1.282b)** — `getUserInfo()` called with no Google token sets `currentUser = { email: 'unknown@user.com' }`. The `if (!currentUser)` guard in session restore then skips overwriting it with the real email. `isAdmin()` checks `currentUser.email` which is wrong. Fix: post-load dupe check now also checks `supabaseSession?.user?.email` directly against `ADMIN_EMAILS` (`const _sessionEmail = (supabaseSession?.user?.email || '').toLowerCase(); const _isAdminNow = isAdmin() || ADMIN_EMAILS.includes(_sessionEmail)`). Added `console.log('🔗 Dupe check: X duplicate(s) found, button shown/hidden')` for debugging.
 - ✅ **Fix "Date RV Arrived on Lot" not saving (v1.283)** — `updateROInSupabase()` had `date_arrived` missing from its Supabase `.update()` payload. Value was correctly read from the Edit RO form into `formData.dateArrived` but silently dropped before the DB write. Fix: added `date_arrived: formData.dateArrived || null` to the payload. Explains why it appeared to work on some ROs (those whose date was auto-set via the status-change path) but failed on others (manually entered via Edit RO).
+- ✅ **Parts chip states — three-state system (v1.284, GH#14)** — `parts_status` column added to `repair_orders` (CHECK constraint: 'sourcing', 'outstanding', 'received'). Three chips: 🔍 Part Sourcing (neon orange, pulsing), ⚠️ Parts Outstanding (yellow, pulsing), ✅ Parts Received (green). `openPartsStatusModal()` for Manager/Admin — click any chip to change state. `setPartsStatus()` writes to Supabase, logs note + audit entry. Auto-flip: `markPartReceived()` checks if all parts received/installed and calls `setPartsStatus(..., 'received')` automatically. Filter buttons: `ps-sourcing`, `ps-outstanding`, `ps-received`. `submitPartsRequest` sets `parts_status='outstanding'`. Backward compat with legacy `has_open_parts_request` boolean.
+- ✅ **Parts Estimate chip + For Estimate Only toggle (v1.285, GH#14 cont.)** — Fourth state: 📋 Parts Estimate (blue, pulsing). Added to `parts_status` CHECK constraint. `For Estimate Only` toggle in Request Parts modal — sets `parts_status='estimate'` instead of `'outstanding'` when enabled. `syncEstimateToggle()` global function updates toggle visual (avoids inline `</script>` parser bug). Estimate button in `openPartsStatusModal`. `ps-estimate` filter button. Spanish: `ESTIMACIÓN DE PARTES`. bobby@, solar@, brandon@ added to `MANAGER_EMAILS` and Supabase `user_roles`.
+- ✅ **ROLLBACK.md** — Emergency rollback guide committed to repo root. Step-by-step terminal instructions, version table with commands, hard-refresh note, GitHub Releases link, and direct Claude fallback option.
 
 ---
 
@@ -329,6 +348,8 @@ supabase functions deploy roof-lookup
 | v1.282 | 2026-03-23 | Duplicate RO Manager — Admin-only 🔗 Merge Dupes button with badge count; modal groups dupes by base PRVS hash; pick master per group; merge notes/parts/time_logs/insurance_scans/audit_log FKs + photo_library; delete duplicates |
 | v1.282b | 2026-03-23 | Fix isAdmin() timing bug — Merge Dupes button wasn't showing because getUserInfo() pollutes currentUser.email; post-load dupe check now also checks supabaseSession?.user?.email against ADMIN_EMAILS directly |
 | v1.283 | 2026-03-23 | Fix "Date RV Arrived on Lot" not saving — date_arrived was missing from updateROInSupabase() payload; silently dropped on every Edit RO save |
+| v1.284 | 2026-03-24 | Parts chip states (GH#14) — three-state system: 🔍 Part Sourcing (neon orange), ⚠️ Parts Outstanding (yellow), ✅ Parts Received (green); parts_status column; openPartsStatusModal; auto-flip on all parts received; filter buttons ps-sourcing/ps-outstanding/ps-received; submitPartsRequest sets parts_status='outstanding' |
+| v1.285 | 2026-03-24 | Four-state parts system + Estimate (GH#14) — 📋 Parts Estimate chip (blue, pulsing); For Estimate Only toggle in Request Parts modal; syncEstimateToggle() global; ps-estimate filter; Spanish ESTIMACIÓN DE PARTES; bobby@/solar@/brandon@ added to Manager role; ROLLBACK.md created; git tag v1.285 |
 | checkin v1.27 | 2026-03-22 | Spanish language toggle for checkin.html — same prvs_lang key, full check-in/out flow, auto clock-out modal, clock-out summary, offline banner translated |
 
 ---
@@ -355,3 +376,5 @@ supabase functions deploy roof-lookup
 | 2026-03-23 | 16 | v1.280 — Fix RO insert race condition: optimistic insert loop replaces generateUniqueROId check-then-insert; 23505 → retry next candidate; submit button disabled during save. v1.281 — Fix roId scope bug: console.log after loop used out-of-scope loop var; changed to data.ro_id. v1.282 — Duplicate RO Manager: getBaseROId/findDuplicateGroups, 🔗 Merge Dupes header button, master picker modal, executeDupeMerge reassigns all FK tables + merges photo_library + deletes dupes. |
 | 2026-03-23 | 17 | v1.282b — Fix isAdmin() timing bug: getUserInfo() with no Google token pollutes currentUser.email to 'unknown@user.com'; Merge Dupes post-load check now also checks supabaseSession?.user?.email against ADMIN_EMAILS directly; added 🔗 Dupe check console.log for debugging. Merge Dupes confirmed working by Roland. End of Session Checklist run; backup.sh executed; CLAUDE_CONTEXT.md updated and pushed. |
 | 2026-03-23 | 18 | v1.283 — Fix "Date RV Arrived on Lot" not saving: date_arrived was missing from updateROInSupabase() Supabase update payload; silently dropped on every Edit RO save. One-line fix. End of Session Checklist run. |
+| 2026-03-24 | 19 | v1.284 — Three-state parts chip system (GH#14): parts_status column, openPartsStatusModal, setPartsStatus, auto-flip on all parts received, filter buttons. Added bobby@/solar@ to MANAGER_EMAILS + Supabase. v1.285 attempt — Parts Estimate chip + For Estimate Only toggle built, but inline `</script>` inside modal.innerHTML template literal broke the page (SyntaxError: Unexpected end of input). Roland restored v1.284 backup via direct GitHub push, causing branch divergence. Session ended at context limit mid-recovery. |
+| 2026-03-24 | 20 | Recovered from git divergence (reset --hard origin/main). Re-applied all v1.285 changes: MANAGER_EMAILS (all 6 managers), syncEstimateToggle() global, submitPartsRequest estimate logic, estimate chip CSS, RO tile chip estimate case, openPartsStatusModal estimate button, ps-estimate filter + logic, Spanish translation. Committed and pushed v1.285. Created git tag v1.285 + release notes. Created ROLLBACK.md (emergency recovery guide). Discussed token usage / session pause causes. End of Session Checklist run. |
