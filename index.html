@@ -1,8 +1,9 @@
 
 <!DOCTYPE html>
 <!--
-    PRVS Dashboard v1.287
+    PRVS Dashboard v1.288
     Released: 2026-03-23
+    v1.288: Add Sourcing to individual part row status dropdown (neon orange, matches RO-level chip color)
     v1.287: Add Wholesale and Retail Price columns to Manage Parts table
     v1.286: Rename "Core Charge" label to "Freight Charge" in Parts form (UI label only; DB column core_charge unchanged)
     v1.285: Parts chip states (GH#14) — four-state parts status system: 🔍 Part Sourcing (neon orange), ⚠️ Parts Outstanding (yellow), ✅ Parts Received (green), 📋 Parts Estimate (blue); parts_status column on repair_orders; openPartsStatusModal for Manager/Admin; auto-flip to Received when all parts marked received; filter buttons for all four states; submitPartsRequest with For Estimate Only toggle; syncEstimateToggle global function; brandon@ solar@ bobby@ added to Manager role
@@ -2580,7 +2581,7 @@
             </div>
             <div style="text-align: right; margin-top: 8px; display:flex; justify-content:flex-end; align-items:center; gap:12px;">
                 <button id="langToggleBtn" onclick="setLang(getLang()==='es'?'en':'es')" title="Toggle Spanish / English" style="background:transparent;border:1px solid #d1d5db;border-radius:6px;padding:3px 10px;font-size:0.75rem;color:#6b7280;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:0.03em;">🌐 ES</button>
-                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.287</span>
+                <span style="font-size: 0.7rem; color: #6b7280; font-family: 'JetBrains Mono', monospace;">v1.288</span>
             </div>
         </header>
 
@@ -5597,11 +5598,12 @@ Notes: ${notes}` : '',
 
         let partsData = {}; // Cache: { roId: [parts array] }
 
-        const PART_STATUSES = ['Ordered','In Transit','Received','Installed','Backordered','Returned','Lost'];
+        const PART_STATUSES = ['Ordered','In Transit','Sourcing','Received','Installed','Backordered','Returned','Lost'];
 
         const PART_STATUS_COLORS = {
             'Ordered':     '#ffcc00',
             'In Transit':  '#ff9500',
+            'Sourcing':    '#ff6a00',
             'Received':    '#34c759',
             'Installed':   '#0a84ff',
             'Backordered': '#ff3b30',
