@@ -1,9 +1,10 @@
 
 <!DOCTYPE html>
 <!--
-    PRVS Dashboard v1.291
+    PRVS Dashboard v1.292
     Released: 2026-03-27
-    v1.291: Parking Spot field (GH#15 Phase 1) — 📍 lot location on every RO card; dropdown of all named lot positions (Bays #1–#14, MR, #15 Wash Bay, #17, Breeze Way N/S, Front Parking, RV Temp, Gates); shown in New RO + Edit RO forms; stored as parking_spot column in repair_orders; SQL migration: ALTER TABLE repair_orders ADD COLUMN IF NOT EXISTS parking_spot TEXT
+    v1.292: Remap parking spot positions to hand-drawn lot designations — Rear Lot R1–R20, Interior Bays B1–B14, Wash Bay 17/18 + W1–W4, Front Lot F1–F12; replaces old Bay#/Breeze Way naming
+    v1.291: Parking Spot field (GH#15 Phase 1) — 📍 lot location on every RO card; dropdown of all named lot positions; shown in New RO + Edit RO forms; stored as parking_spot column in repair_orders; SQL migration: ALTER TABLE repair_orders ADD COLUMN IF NOT EXISTS parking_spot TEXT
     v1.290: Kenect messaging integration (GH#10) — 💬 Messages button on each RO card; conversation modal with chat-style thread (inbound left, outbound right); send message from dashboard; review request button; Admin Settings: Kenect Location ID config + Test Connection; kenect-proxy Supabase Edge Function (Bearer auth, actions: test_credentials, get_locations, get_conversation, send_message, send_review_request)
     v1.289: Move Supplier Contact section to top of Add/Edit Part form
     v1.288: Add Sourcing to individual part row status dropdown (neon orange, matches RO-level chip color)
@@ -11127,34 +11128,65 @@ Notes: ${notes}` : '',
                         <label class="form-label">📍 Parking Spot</label>
                         <select class="form-select" name="parkingSpot" id="new_parkingSpot">
                             <option value="">— Not assigned —</option>
-                            <optgroup label="Interior Bays (Upper)">
-                                <option value="Bay #9">Bay #9</option>
-                                <option value="Bay #10">Bay #10</option>
-                                <option value="Bay #11">Bay #11</option>
-                                <option value="Bay MR">Bay MR</option>
-                                <option value="Bay #12">Bay #12</option>
-                                <option value="Bay #13">Bay #13</option>
-                                <option value="Bay #14">Bay #14</option>
+                            <optgroup label="Rear Lot (R)">
+                                <option value="R1">R1</option>
+                                <option value="R2">R2</option>
+                                <option value="R3">R3</option>
+                                <option value="R4">R4</option>
+                                <option value="R5">R5</option>
+                                <option value="R6">R6</option>
+                                <option value="R7">R7</option>
+                                <option value="R8">R8</option>
+                                <option value="R9">R9</option>
+                                <option value="R10">R10</option>
+                                <option value="R11">R11</option>
+                                <option value="R12">R12</option>
+                                <option value="R13">R13</option>
+                                <option value="R14">R14</option>
+                                <option value="R15">R15</option>
+                                <option value="R16">R16</option>
+                                <option value="R17">R17</option>
+                                <option value="R18">R18</option>
+                                <option value="R19">R19</option>
+                                <option value="R20">R20</option>
                             </optgroup>
-                            <optgroup label="Interior Bays (Lower)">
-                                <option value="Bay #1">Bay #1</option>
-                                <option value="Bay #2">Bay #2</option>
-                                <option value="Bay #3">Bay #3</option>
-                                <option value="Bay #4">Bay #4</option>
-                                <option value="Breeze Way N">Breeze Way N</option>
-                                <option value="Office">Office</option>
-                                <option value="Breeze Way S">Breeze Way S</option>
-                                <option value="Bay #5">Bay #5</option>
-                                <option value="Bay #6">Bay #6</option>
-                                <option value="Bay #7">Bay #7</option>
-                                <option value="Bay #8">Bay #8</option>
+                            <optgroup label="Interior Bays (B)">
+                                <option value="B1">B1</option>
+                                <option value="B2">B2</option>
+                                <option value="B3">B3</option>
+                                <option value="B4">B4</option>
+                                <option value="B5">B5</option>
+                                <option value="B6">B6</option>
+                                <option value="B7">B7</option>
+                                <option value="B8">B8</option>
+                                <option value="B9">B9</option>
+                                <option value="B10">B10</option>
+                                <option value="B11">B11</option>
+                                <option value="B12">B12</option>
+                                <option value="B13">B13</option>
+                                <option value="B14">B14</option>
                             </optgroup>
-                            <optgroup label="Outdoor">
-                                <option value="Bay #17">Bay #17</option>
-                                <option value="Wash Bay #15">Wash Bay #15</option>
-                                <option value="Front Parking">Front Parking</option>
-                                <option value="RV Temp">RV Temp</option>
-                                <option value="Gates">Gates</option>
+                            <optgroup label="Wash (W)">
+                                <option value="Wash Bay 17">Wash Bay 17</option>
+                                <option value="Wash Bay 18">Wash Bay 18</option>
+                                <option value="W1">W1</option>
+                                <option value="W2">W2</option>
+                                <option value="W3">W3</option>
+                                <option value="W4">W4</option>
+                            </optgroup>
+                            <optgroup label="Front Lot (F)">
+                                <option value="F1">F1</option>
+                                <option value="F2">F2</option>
+                                <option value="F3">F3</option>
+                                <option value="F4">F4</option>
+                                <option value="F5">F5</option>
+                                <option value="F6">F6</option>
+                                <option value="F7">F7</option>
+                                <option value="F8">F8</option>
+                                <option value="F9">F9</option>
+                                <option value="F10">F10</option>
+                                <option value="F11">F11</option>
+                                <option value="F12">F12</option>
                             </optgroup>
                         </select>
                     </div>
@@ -11593,34 +11625,65 @@ Notes: ${notes}` : '',
                         <label class="form-label">📍 Parking Spot</label>
                         <select class="form-select" id="editParkingSpot">
                             <option value="">— Not assigned —</option>
-                            <optgroup label="Interior Bays (Upper)">
-                                <option value="Bay #9">Bay #9</option>
-                                <option value="Bay #10">Bay #10</option>
-                                <option value="Bay #11">Bay #11</option>
-                                <option value="Bay MR">Bay MR</option>
-                                <option value="Bay #12">Bay #12</option>
-                                <option value="Bay #13">Bay #13</option>
-                                <option value="Bay #14">Bay #14</option>
+                            <optgroup label="Rear Lot (R)">
+                                <option value="R1">R1</option>
+                                <option value="R2">R2</option>
+                                <option value="R3">R3</option>
+                                <option value="R4">R4</option>
+                                <option value="R5">R5</option>
+                                <option value="R6">R6</option>
+                                <option value="R7">R7</option>
+                                <option value="R8">R8</option>
+                                <option value="R9">R9</option>
+                                <option value="R10">R10</option>
+                                <option value="R11">R11</option>
+                                <option value="R12">R12</option>
+                                <option value="R13">R13</option>
+                                <option value="R14">R14</option>
+                                <option value="R15">R15</option>
+                                <option value="R16">R16</option>
+                                <option value="R17">R17</option>
+                                <option value="R18">R18</option>
+                                <option value="R19">R19</option>
+                                <option value="R20">R20</option>
                             </optgroup>
-                            <optgroup label="Interior Bays (Lower)">
-                                <option value="Bay #1">Bay #1</option>
-                                <option value="Bay #2">Bay #2</option>
-                                <option value="Bay #3">Bay #3</option>
-                                <option value="Bay #4">Bay #4</option>
-                                <option value="Breeze Way N">Breeze Way N</option>
-                                <option value="Office">Office</option>
-                                <option value="Breeze Way S">Breeze Way S</option>
-                                <option value="Bay #5">Bay #5</option>
-                                <option value="Bay #6">Bay #6</option>
-                                <option value="Bay #7">Bay #7</option>
-                                <option value="Bay #8">Bay #8</option>
+                            <optgroup label="Interior Bays (B)">
+                                <option value="B1">B1</option>
+                                <option value="B2">B2</option>
+                                <option value="B3">B3</option>
+                                <option value="B4">B4</option>
+                                <option value="B5">B5</option>
+                                <option value="B6">B6</option>
+                                <option value="B7">B7</option>
+                                <option value="B8">B8</option>
+                                <option value="B9">B9</option>
+                                <option value="B10">B10</option>
+                                <option value="B11">B11</option>
+                                <option value="B12">B12</option>
+                                <option value="B13">B13</option>
+                                <option value="B14">B14</option>
                             </optgroup>
-                            <optgroup label="Outdoor">
-                                <option value="Bay #17">Bay #17</option>
-                                <option value="Wash Bay #15">Wash Bay #15</option>
-                                <option value="Front Parking">Front Parking</option>
-                                <option value="RV Temp">RV Temp</option>
-                                <option value="Gates">Gates</option>
+                            <optgroup label="Wash (W)">
+                                <option value="Wash Bay 17">Wash Bay 17</option>
+                                <option value="Wash Bay 18">Wash Bay 18</option>
+                                <option value="W1">W1</option>
+                                <option value="W2">W2</option>
+                                <option value="W3">W3</option>
+                                <option value="W4">W4</option>
+                            </optgroup>
+                            <optgroup label="Front Lot (F)">
+                                <option value="F1">F1</option>
+                                <option value="F2">F2</option>
+                                <option value="F3">F3</option>
+                                <option value="F4">F4</option>
+                                <option value="F5">F5</option>
+                                <option value="F6">F6</option>
+                                <option value="F7">F7</option>
+                                <option value="F8">F8</option>
+                                <option value="F9">F9</option>
+                                <option value="F10">F10</option>
+                                <option value="F11">F11</option>
+                                <option value="F12">F12</option>
                             </optgroup>
                         </select>
                     </div>
