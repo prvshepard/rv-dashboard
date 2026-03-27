@@ -1,8 +1,9 @@
 
 <!DOCTYPE html>
 <!--
-    PRVS Dashboard v1.293
+    PRVS Dashboard v1.294
     Released: 2026-03-27
+    v1.294: QR scan now opens main RO tile (GH#15) — QR codes link to index.html?ro= instead of checkin.html; deep-link handler in renderBoard() reads ?ro= URL param, scrolls to matching tile, and pulses a 3× blue highlight ring; 🚪 Tech Check In button still available on the tile for techs; QR modal title updated accordingly
     v1.293: QR Print Sheet Phase 2 (GH#15) — dual-sticker print window: 3"×3" windshield sticker (customer name, RV, RO#, parking spot chip) + 1"×1" key tag; both generated fresh via QRCode.js in print window; proper @media print CSS with dashed cut borders and physical inch sizing
     v1.292: Remap parking spot positions to hand-drawn lot designations — Rear Lot R1–R20, Interior Bays B1–B14, Wash Bay 17/18 + W1–W4, Front Lot F1–F12; replaces old Bay#/Breeze Way naming
     v1.291: Parking Spot field (GH#15 Phase 1) — 📍 lot location on every RO card; dropdown of all named lot positions; shown in New RO + Edit RO forms; stored as parking_spot column in repair_orders; SQL migration: ALTER TABLE repair_orders ADD COLUMN IF NOT EXISTS parking_spot TEXT
@@ -6210,6 +6211,49 @@ Notes: ${notes}` : '',
             renderBoard();
         }
 
+        // Deep-link: scroll to + highlight an RO tile when ?ro= is in the URL
+        // Fires once on the first renderBoard() that contains the target RO, then clears.
+        let _deepLinkRoId = new URLSearchParams(window.location.search).get('ro');
+
+        function handleDeepLink() {
+            if (!_deepLinkRoId) return;
+            const target = _deepLinkRoId;
+
+            // Find the RO card whose roId matches the URL param
+            const idx = currentFilteredData.findIndex(ro => {
+                const id = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
+                return id === target;
+            });
+            if (idx === -1) return;          // not in current filter view — wait for next render
+
+            const card = document.querySelector(`[data-ro-index="${idx}"]`);
+            if (!card) return;
+
+            // Clear the flag so we don't re-highlight on every subsequent renderBoard()
+            _deepLinkRoId = null;
+
+            // Scroll the card into view
+            setTimeout(() => {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Pulse a blue highlight ring 3× to draw the eye
+                let pulses = 0;
+                const pulse = () => {
+                    card.style.transition = 'box-shadow 0.35s ease, outline 0.35s ease';
+                    card.style.outline = '3px solid #0A84FF';
+                    card.style.boxShadow = '0 0 0 6px rgba(10,132,255,0.35), 0 0 40px rgba(10,132,255,0.2)';
+                    setTimeout(() => {
+                        card.style.outline = '';
+                        card.style.boxShadow = '';
+                        pulses++;
+                        if (pulses < 3) setTimeout(pulse, 450);
+                        else card.style.transition = '';
+                    }, 400);
+                };
+                setTimeout(pulse, 300); // small delay to let scroll settle
+            }, 80);
+        }
+
         // Initialize
         function init() {
             console.log('📦 PRVS Dashboard v1.282 - Released 2026-03-23');
@@ -6857,6 +6901,9 @@ Notes: ${notes}` : '',
             if (accessToken) {
                 setTimeout(() => loadAllDriveImages(), 100);
             }
+
+            // Deep-link: scroll to and highlight the target RO if ?ro= is in the URL
+            if (_deepLinkRoId) handleDeepLink();
         }
 
         // Generate QR codes for all ROs
@@ -6887,8 +6934,8 @@ Notes: ${notes}` : '',
             // Create unique RO ID from customer name + date
             const roId = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
             
-            // Shorter URL format for better scannability
-            const checkInURL = `https://patriotsrv.github.io/rv-dashboard/checkin.html?ro=${encodeURIComponent(roId)}`;
+            // Shorter URL — scans open the RO tile in the main dashboard
+            const checkInURL = `https://patriotsrv.github.io/rv-dashboard/?ro=${encodeURIComponent(roId)}`;
             
             console.log('=== QR Code Debug ===');
             console.log('RO ID:', roId);
@@ -6980,13 +7027,13 @@ Notes: ${notes}` : '',
             if (!ro) return;
             
             const roId = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
-            const checkInURL = `https://patriotsrv.github.io/rv-dashboard/checkin.html?ro=${encodeURIComponent(roId)}&customer=${encodeURIComponent(ro.customerName)}`;
+            const checkInURL = `https://patriotsrv.github.io/rv-dashboard/?ro=${encodeURIComponent(roId)}`;
             
             // Create modal overlay
             const modalHTML = `
                 <div id="qrModalOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;" onclick="closeQRModal(event)">
                     <div style="background: white; border-radius: 16px; padding: 40px; max-width: 500px; width: 100%; text-align: center;" onclick="event.stopPropagation()">
-                        <h2 style="margin-bottom: 20px; color: #1e293b; font-family: 'Barlow Condensed', sans-serif;">QR Code - Check In/Out</h2>
+                        <h2 style="margin-bottom: 20px; color: #1e293b; font-family: 'Barlow Condensed', sans-serif;">QR Code — Scan to Open RO</h2>
                         <div style="background: white; padding: 20px; border-radius: 12px; display: inline-block; border: 2px solid #e2e8f0;">
                             <canvas id="qrModalCanvas" width="300" height="300"></canvas>
                         </div>
@@ -6994,7 +7041,7 @@ Notes: ${notes}` : '',
                         <div style="margin-top: 8px; font-size: 1rem; font-weight: 600; color: #475569;">${ro.rv || 'RV Not Specified'}</div>
                         <div style="margin-top: 8px; font-size: 0.9rem; color: #64748b; font-family: 'JetBrains Mono', monospace;">${roId}</div>
                         <div style="margin-top: 20px; padding: 12px; background: #f1f5f9; border-radius: 8px; font-size: 0.85rem; color: #475569;">
-                            Scan this QR code to check in/out of this repair order
+                            Scan to open this RO on the dashboard — use 🚪 Tech Check In from there
                         </div>
                         <div style="margin-top: 20px; display: flex; gap: 12px; justify-content: center;">
                             <button onclick="printQRLabel(${index}); closeQRModal();" style="padding: 12px 24px; background: #0A84FF; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">
@@ -7061,7 +7108,7 @@ Notes: ${notes}` : '',
             if (!ro) return;
 
             const roId = ro.roId || generateROId(ro.customerName, ro.rv || '', ro.dateReceived);
-            const checkInURL = 'https://patriotsrv.github.io/rv-dashboard/checkin.html?ro=' + encodeURIComponent(roId);
+            const checkInURL = 'https://patriotsrv.github.io/rv-dashboard/?ro=' + encodeURIComponent(roId);
             const customerName = (ro.customerName || 'Unknown').replace(/</g,'&lt;').replace(/>/g,'&gt;');
             const rvMake = (ro.rv || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
             const spotText = (ro.parkingSpot || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
